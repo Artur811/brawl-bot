@@ -1,9 +1,11 @@
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiohttp import web
 import asyncio
+import os
 
-TOKEN = "8741988605:AAEVUuVu2TEP3269YgYjfsGNaUYYb7EOQWc"
+TOKEN = "ТВОЙ_ТОКЕН"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -16,9 +18,7 @@ async def start(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="🛒 Купить",
-                    web_app=WebAppInfo(
-                        url="https://funpay.com/users/19690950/"
-                    )
+                    url="https://funpay.com/users/19690950/"
                 )
             ]
         ]
@@ -41,7 +41,23 @@ async def start(message: types.Message):
     await message.answer(text, reply_markup=keyboard)
 
 async def main():
+    app = web.Application()
+
+    async def health(request):
+        return web.Response(text="Bot is running")
+
+    app.router.add_get("/", health)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.environ.get("PORT", 10000))
+
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
     print("Бот запущен")
+
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
