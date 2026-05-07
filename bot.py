@@ -5,7 +5,7 @@ from aiohttp import web
 import asyncio
 import os
 
-TOKEN = "ТВОЙ_ТОКЕН"
+TOKEN = "8741988605:AAEVUuVu2TEP3269YgYjfsGNaUYYb7EOQWc"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
