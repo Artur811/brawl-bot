@@ -18,7 +18,7 @@ async def start(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="🛒 Купить",
-                    url="https://funpay.com/users/19690950/"
+                    url="http://t.me/bsfunpaysw1zy_bot/myapp"
                 )
             ]
         ]
