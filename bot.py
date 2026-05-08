@@ -24,28 +24,17 @@ async def start(message: types.Message):
         ]
     )
 
-    text = (
-        "💎 Лучший магазин для игроков Brawl Stars 💎\n\n"
-        "🛒 У нас можно купить:\n"
-        "• Аккаунты разных рангов 🏆\n"
-        "• Гемы 💚\n"
-        "• Brawl Pass 🎟️\n"
-        "• Донат и внутриигровые товары ⚡\n"
-        "• Акции магазинов 🛍️🔥\n\n"
-        "⚡ Быстрая выдача\n"
-        "🔒 Безопасные сделки\n"
-        "💬 Отзывчивая поддержка\n\n"
-        "🚀 Прокачай свой аккаунт уже сегодня!"
+    await message.answer(
+        "💎 Лучший магазин для игроков Brawl Stars 💎",
+        reply_markup=keyboard
     )
 
-    await message.answer(text, reply_markup=keyboard)
+async def health(request):
+    return web.Response(text="OK")
 
 async def main():
+
     app = web.Application()
-
-    async def health(request):
-        return web.Response(text="Bot is running")
-
     app.router.add_get("/", health)
 
     runner = web.AppRunner(app)
@@ -56,7 +45,7 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
-    print("Бот запущен")
+    print("BOT STARTED")
 
     await dp.start_polling(bot)
 
