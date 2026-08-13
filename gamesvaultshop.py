@@ -16,7 +16,7 @@ from aiogram.exceptions import TelegramBadRequest
 # НАСТРОЙКИ
 # =========================================================
 
-TOKEN = "8994024293:AAFGS6xgBI0uVtGRMJQlARirDau8m-l2gOY"
+TOKEN ="8994024293:AAFGS6xgBI0uVtGRMJQlARirDau8m-l2gOY"
 
 ADMIN_ID = 8833455229
 CHANNEL_ID = -1003924262565
