@@ -17,7 +17,7 @@ from aiogram.exceptions import TelegramBadRequest
 # НАСТРОЙКИ
 # =========================================================
 
-TOKEN = os.getenv("8994024293:AAFGS6xgBI0uVtGRMJQlARirDau8m-l2gOY")
+TOKEN = os.getenv("8994024293:AAGPKSVcsS-zUuBpEUT426db4PtSk-cWnVQ")
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8833455229"))
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1003924262565"))
