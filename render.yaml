@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: gamesvaultshop-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python gamesvaultshop_webhook.py
+    healthCheckPath: /health
+    autoDeploy: true
