@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -7,7 +8,7 @@ from aiogram.types import (
     Message,
     CallbackQuery,
     InlineKeyboardButton,
-    InlineKeyboardMarkup
+    InlineKeyboardMarkup,
 )
 from aiogram.exceptions import TelegramBadRequest
 
@@ -16,11 +17,16 @@ from aiogram.exceptions import TelegramBadRequest
 # НАСТРОЙКИ
 # =========================================================
 
-TOKEN ="8994024293:AAFGS6xgBI0uVtGRMJQlARirDau8m-l2gOY"
+TOKEN = os.getenv("8994024293:AAFGS6xgBI0uVtGRMJQlARirDau8m-l2gOY")
 
-ADMIN_ID = 8833455229
-CHANNEL_ID = -1003924262565
-TELCELL_NUMBER = "043055510"
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8833455229"))
+CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1003924262565"))
+TELCELL_NUMBER = os.getenv("TELCELL_NUMBER", "043055510")
+
+if not TOKEN:
+    raise RuntimeError(
+        "❌ BOT_TOKEN не найден. Добавь BOT_TOKEN в Environment Variables Render."
+    )
 
 logging.basicConfig(level=logging.INFO)
 
@@ -89,6 +95,10 @@ GAME_NAMES = {
 }
 
 
+# =========================================================
+# ЗАКАЗЫ
+# =========================================================
+
 orders = {}
 order_counter = 1000
 
@@ -153,7 +163,7 @@ def product_menu(game):
 # МЕНЮ ОПЛАТЫ
 # =========================================================
 
-def payment_menu():
+def payment_menu(game):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -171,7 +181,7 @@ def payment_menu():
             [
                 InlineKeyboardButton(
                     text="⬅️ Հետ",
-                    callback_data="back_main"
+                    callback_data=f"game:{game}"
                 )
             ],
         ]
@@ -187,7 +197,7 @@ def admin_buttons(user_id):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ Ընդունել կտրոնը",
+                    text="✅ Ընդունել չեկը",
                     callback_data=f"admin_accept:{user_id}"
                 ),
                 InlineKeyboardButton(
@@ -212,17 +222,32 @@ def admin_buttons(user_id):
 
 
 # =========================================================
+# КНОПКА НАЗАД ПОСЛЕ ЧЕКА
+# =========================================================
+
+def receipt_back_menu(game):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Հետ",
+                    callback_data=f"game:{game}"
+                )
+            ]
+        ]
+    )
+
+
+# =========================================================
 # START
 # =========================================================
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer(
-        "🎮 <b>GAMES VAULT SHOP</b> ❤️‍🔥
 
-"
-        "Բարի գալուստ։
-"
+    await message.answer(
+        "🎮 <b>GAMES VAULT SHOP</b> ❤️‍🔥\n\n"
+        "Բարի գալուստ։\n"
         "Ընտրեք խաղը 👇",
         reply_markup=main_menu(),
         parse_mode="HTML"
@@ -235,19 +260,20 @@ async def start(message: Message):
 
 @dp.callback_query(F.data.startswith("game:"))
 async def select_game(callback: CallbackQuery):
+
     game = callback.data.split(":")[1]
 
     if game not in PRODUCTS:
+
         await callback.answer(
             "❌ Խաղը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     await callback.message.edit_text(
-        f"<b>{GAME_NAMES[game]}</b>
-
-"
+        f"<b>{GAME_NAMES[game]}</b>\n\n"
         "🎁 Ընտրեք ապրանքը 👇",
         reply_markup=product_menu(game),
         parse_mode="HTML"
@@ -264,6 +290,7 @@ async def select_game(callback: CallbackQuery):
 async def select_product(callback: CallbackQuery):
 
     try:
+
         _, game, index = callback.data.split(":")
 
         index = int(index)
@@ -307,16 +334,10 @@ async def select_product(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
-        "🛒 <b>Պատվերի հաստատում</b>
-
-"
-        f"🎮 Խաղ՝ <b>{GAME_NAMES[game]}</b>
-"
-        f"🎁 Ապրանք՝ <b>{name}</b>
-"
-        f"💰 Գին՝ <b>{price} ֏</b>
-
-"
+        "🛒 <b>Պատվերի հաստատում</b>\n\n"
+        f"🎮 Խաղ՝ <b>{GAME_NAMES[game]}</b>\n"
+        f"🎁 Ապրանք՝ <b>{name}</b>\n"
+        f"💰 Գին՝ <b>{price} ֏</b>\n\n"
         "Ճի՞շտ է ամեն ինչ։",
         reply_markup=keyboard,
         parse_mode="HTML"
@@ -335,17 +356,19 @@ async def confirm_buy(callback: CallbackQuery):
     order = orders.get(callback.from_user.id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "payment_method"
 
     await callback.message.edit_text(
         "💳 <b>Ընտրեք վճարման եղանակը</b>",
-        reply_markup=payment_menu(),
+        reply_markup=payment_menu(order["game"]),
         parse_mode="HTML"
     )
 
@@ -362,10 +385,12 @@ async def pay_cash(callback: CallbackQuery):
     order = orders.get(callback.from_user.id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["payment_method"] = "Telcell"
@@ -389,30 +414,18 @@ async def pay_cash(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
-        "😎❤️‍🔥 <b>Վճարման կարգը</b>
+        "😎❤️‍🔥 <b>Վճարման կարգը</b>\n\n"
 
-"
+        "1️⃣ Գնացեք մոտակա <b>Telcell</b> տերմինալ։\n\n"
 
-        "1️⃣ Գնացեք մոտակա <b>Telcell</b> տերմինալ։
-
-"
-
-        "2️⃣ Ընտրեք <b>Telcell Wallet</b>։
-
-"
+        "2️⃣ Ընտրեք <b>Telcell Wallet</b>։\n\n"
 
         f"3️⃣ Մուտքագրեք համարը՝ "
-        f"<code>{TELCELL_NUMBER}</code>
+        f"<code>{TELCELL_NUMBER}</code>\n\n"
 
-"
+        "4️⃣ Կատարեք վճարումը։\n\n"
 
-        "4️⃣ Կատարեք վճարումը։
-
-"
-
-        "5️⃣ 📸 Վճարումից հետո ուղարկեք չեկի լուսանկարը։
-
-"
+        "5️⃣ 📸 Վճարումից հետո ուղարկեք չեկի լուսանկարը։\n\n"
 
         "6️⃣ Չեկը հաստատվելուց հետո "
         "կպահանջվի միայն խաղային ID-ն։",
@@ -434,10 +447,12 @@ async def pay_card(callback: CallbackQuery):
     order = orders.get(callback.from_user.id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["payment_method"] = "Card"
@@ -447,26 +462,26 @@ async def pay_card(callback: CallbackQuery):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text="💵 Վճարել Telcell-ով",
+                    callback_data="pay_cash"
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="⬅️ Հետ",
                     callback_data=f"game:{order['game']}"
                 )
-            ]
+            ],
         ]
     )
 
     await callback.message.edit_text(
-        "💳 <b>Վճարում քարտով</b>
+        "💳 <b>Վճարում քարտով</b>\n\n"
 
-"
-
-        "⚠️ <b>Քարտով վճարումը դեռ հասանելի չէ։</b>
-
-"
+        "⚠️ <b>Քարտով վճարումը դեռ հասանելի չէ։</b>\n\n"
 
         "🔧 Մենք դեռ աշխատում ենք այս վճարման եղանակի "
-        "միացման վրա։
-
-"
+        "միացման վրա։\n\n"
 
         "💵 Այս պահին կարող եք վճարել "
         "<b>Telcell</b>-ով։",
@@ -488,34 +503,22 @@ async def send_receipt(callback: CallbackQuery):
     order = orders.get(callback.from_user.id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "waiting_receipt"
 
     await callback.message.edit_text(
-        "📸 <b>Ուղարկեք վճարման չեկի լուսանկարը։</b>
+        "📸 <b>Ուղարկեք վճարման չեկի լուսանկարը։</b>\n\n"
+        "Ուղարկեք ամբողջական և ընթեռնելի լուսանկար։\n\n"
+        "⬅️ Կարող եք վերադառնալ ներքևի կոճակով։",
 
-"
-        "Ուղարկեք ամբողջական և ընթեռնելի լուսանկար։
-
-"
-        "⬅️ Եթե ցանկանում եք վերադառնալ, օգտագործեք "
-        "ներքևի կոճակը։",
-
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="⬅️ Հետ",
-                        callback_data=f"game:{order['game']}"
-                    )
-                ]
-            ]
-        ),
+        reply_markup=receipt_back_menu(order["game"]),
 
         parse_mode="HTML"
     )
@@ -543,15 +546,14 @@ async def receive_receipt(message: Message):
     order["status"] = "waiting_game_id"
 
     await message.answer(
-        "✅ <b>Կտրոնը ստացվեց։</b>
+        "✅ <b>Կտրոնը ստացվեց։</b>\n\n"
 
-"
+        "📝 Այժմ ուղարկեք ձեր խաղային "
+        "<b>ID / Login</b>-ը։\n\n"
 
-        "📝 Այժմ ուղարկեք միայն ձեր խաղային "
-        "<b>Login / Գաղտնաբառ</b>-ը։
+        "⚠️ Մի ուղարկեք բանկային գաղտնաբառեր կամ քարտի տվյալներ։",
 
-",
-
+        reply_markup=receipt_back_menu(order["game"]),
 
         parse_mode="HTML"
     )
@@ -572,48 +574,51 @@ async def receive_text(message: Message):
 
     status = order.get("status")
 
+    # =====================================================
     # GAME ID
+    # =====================================================
+
     if status == "waiting_game_id":
 
         order["game_id"] = message.text.strip()
         order["status"] = "admin_review"
 
         await message.answer(
-            "✅ <b>ID-ն ստացվեց։</b>
-
-"
+            "✅ <b>ID-ն ստացվեց։</b>\n\n"
             "⏳ Պատվերը ուղարկվեց ադմինիստրատորին։",
             parse_mode="HTML"
         )
 
         await send_order_to_admin(user_id)
 
+    # =====================================================
     # REFUND PHONE
+    # =====================================================
+
     elif status == "waiting_refund_phone":
 
         order["refund_data"] = message.text.strip()
         order["status"] = "refund_admin"
 
         await message.answer(
-            "✅ <b>Հեռախոսահամարը ստացվեց։</b>
-
-"
+            "✅ <b>Հեռախոսահամարը ստացվեց։</b>\n\n"
             "⏳ Վերադարձը կստուգվի ադմինիստրատորի կողմից։",
             parse_mode="HTML"
         )
 
         await send_refund_to_admin(user_id)
 
+    # =====================================================
     # REFUND CARD
+    # =====================================================
+
     elif status == "waiting_refund_card":
 
         order["refund_data"] = message.text.strip()
         order["status"] = "refund_admin"
 
         await message.answer(
-            "✅ <b>Տվյալները ստացվեցին։</b>
-
-"
+            "✅ <b>Տվյալները ստացվեցին։</b>\n\n"
             "⏳ Վերադարձը կստուգվի ադմինիստրատորի կողմից։",
             parse_mode="HTML"
         )
@@ -635,31 +640,19 @@ async def send_order_to_admin(user_id):
     order["number"] = order_counter
 
     caption = (
-        "🛒 <b>ՆՈՐ ՊԱՏՎԵՐ</b>
+        "🛒 <b>ՆՈՐ ՊԱՏՎԵՐ</b>\n\n"
 
-"
+        f"🆔 Պատվեր՝ <b>#{order['number']}</b>\n"
+        f"👤 Հաճախորդ՝ <b>{order['name']}</b>\n"
+        f"🔢 Telegram ID՝ <code>{user_id}</code>\n\n"
 
-        f"🆔 Պատվեր՝ <b>#{order['number']}</b>
-"
-        f"👤 Հաճախորդ՝ <b>{order['name']}</b>
-"
-        f"🔢 Telegram ID՝ <code>{user_id}</code>
-
-"
-
-        f"🎮 Խաղ՝ <b>{GAME_NAMES[order['game']]}</b>
-"
-        f"🎁 Ապրանք՝ <b>{order['product']}</b>
-"
-        f"💰 Գին՝ <b>{order['price']} ֏</b>
-"
+        f"🎮 Խաղ՝ <b>{GAME_NAMES[order['game']]}</b>\n"
+        f"🎁 Ապրանք՝ <b>{order['product']}</b>\n"
+        f"💰 Գին՝ <b>{order['price']} ֏</b>\n"
         f"💳 Վճարում՝ "
-        f"<b>{order.get('payment_method', '-')}</b>
-"
+        f"<b>{order.get('payment_method', '-')}</b>\n"
         f"🎮 Game ID՝ "
-        f"<code>{order.get('game_id', '-')}</code>
-
-"
+        f"<code>{order.get('game_id', '-')}</code>\n\n"
 
         "📸 Կտրոնը կցված է։"
     )
@@ -685,36 +678,38 @@ async def send_order_to_admin(user_id):
 
 
 # =========================================================
-# АДМИН — ПРИНЯТЬ
+# АДМИН — ПРИНЯТЬ ЧЕК
 # =========================================================
 
 @dp.callback_query(F.data.startswith("admin_accept:"))
 async def admin_accept(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "in_progress"
 
     await bot.send_message(
         user_id,
-        "✅ <b>Կտրոնը ընդունվեց։</b>
-
-"
+        "✅ <b>Կտրոնը ընդունվեց։</b>\n\n"
         "⏳ Պատվերը կատարման մեջ է։",
         parse_mode="HTML"
     )
@@ -760,83 +755,57 @@ async def admin_accept(callback: CallbackQuery):
 async def admin_reject(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "rejected"
 
+    # =====================================================
     # КЛИЕНТУ
+    # =====================================================
+
     await bot.send_message(
         user_id,
-        "❌ <b>Վճարման կտրոնը մերժվեց։</b>
 
-"
+        "❌ <b>Վճարման կտրոնը մերժվեց։</b>\n\n"
         "Խնդրում ենք կապվել ադմինիստրատորի հետ։",
-        parse_mode="HTML"
-    )
-
-    # АДМИН-КАНАЛ
-    await bot.send_message(
-        CHANNEL_ID,
-        "❌ <b>ՊԱՏՎԵՐԸ ՄԵՐԺՎԵՑ</b>
-
-"
-
-        f"🆔 Պատվեր՝ "
-        f"<b>#{order.get('number', '-')}</b>
-"
-
-        f"👤 Հաճախորդ՝ "
-        f"<b>{order['name']}</b>
-"
-
-        f"🔢 Telegram ID՝ "
-        f"<code>{user_id}</code>
-
-"
-
-        f"🎮 Խաղ՝ "
-        f"<b>{GAME_NAMES[order['game']]}</b>
-"
-
-        f"🎁 Ապրանք՝ "
-        f"<b>{order['product']}</b>
-"
-
-        f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-"
-
-        f"💳 Վճարում՝ "
-        f"<b>{order.get('payment_method', '-')}</b>
-"
-
-        f"🎮 Game ID՝ "
-        f"<code>{order.get('game_id', '-')}</code>
-
-"
-
-        "❌ Կարգավիճակ՝ <b>Մերժված</b>",
 
         parse_mode="HTML"
     )
 
-    await callback.message.edit_reply_markup(
-        reply_markup=None
+    # =====================================================
+    # КАНАЛ — ЗАКАЗ ДАЖЕ ПРИ МЕЖЕТ
+    # =====================================================
+
+    await send_order_status_to_channel(
+        order,
+        user_id,
+        "❌ Մերժված"
     )
+
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     await callback.answer("❌ Չեկը մերժվեց")
 
@@ -849,89 +818,62 @@ async def admin_reject(callback: CallbackQuery):
 async def admin_done(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "completed"
 
+    # =====================================================
     # КЛИЕНТУ
+    # =====================================================
+
     await bot.send_message(
         user_id,
-        "🎉 <b>Պատվերը կատարված է։</b>
 
-"
+        "🎉 <b>Պատվերը կատարված է։</b>\n\n"
 
-        f"🎮 {GAME_NAMES[order['game']]}
-"
-        f"🎁 {order['product']}
+        f"🎮 {GAME_NAMES[order['game']]}\n"
+        f"🎁 {order['product']}\n\n"
 
-"
-
-        "✅ Դոնաթը կատարվել է։
-"
+        "✅ Դոնաթը կատարվել է։\n"
         "❤️ Շնորհակալություն Games Vault Shop-ից օգտվելու համար։",
 
         parse_mode="HTML"
     )
 
-    # АДМИН-КАНАЛ
-    await bot.send_message(
-        CHANNEL_ID,
-        "🎉 <b>ՊԱՏՎԵՐԸ ԿԱՏԱՐՎԱԾ Է</b>
+    # =====================================================
+    # КАНАЛ
+    # =====================================================
 
-"
-
-        f"🆔 Պատվեր՝ "
-        f"<b>#{order.get('number', '-')}</b>
-"
-
-        f"👤 Հաճախորդ՝ "
-        f"<b>{order['name']}</b>
-"
-
-        f"🔢 Telegram ID՝ "
-        f"<code>{user_id}</code>
-
-"
-
-        f"🎮 Խաղ՝ "
-        f"<b>{GAME_NAMES[order['game']]}</b>
-"
-
-        f"🎁 Ապրանք՝ "
-        f"<b>{order['product']}</b>
-"
-
-        f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-"
-
-        f"🎮 Game ID՝ "
-        f"<code>{order.get('game_id', '-')}</code>
-
-"
-
-        "✅ Կարգավիճակ՝ <b>Կատարված</b>",
-
-        parse_mode="HTML"
+    await send_order_status_to_channel(
+        order,
+        user_id,
+        "✅ Կատարված"
     )
 
-    await callback.message.edit_reply_markup(
-        reply_markup=None
-    )
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     await callback.answer("🎉 Պատվերը կատարված է")
 
@@ -944,71 +886,42 @@ async def admin_done(callback: CallbackQuery):
 async def admin_not_given(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "refund_choice"
 
-    # АДМИН-КАНАЛ
-    await bot.send_message(
-        CHANNEL_ID,
-        "❌ <b>ՊԱՏՎԵՐԸ ՉԻ ՏՐԱՄԱԴՐՎԵԼ</b>
+    # =====================================================
+    # КАНАЛ — ЗАКАЗ НЕ ВЫДАН
+    # =====================================================
 
-"
-
-        f"🆔 Պատվեր՝ "
-        f"<b>#{order.get('number', '-')}</b>
-"
-
-        f"👤 Հաճախորդ՝ "
-        f"<b>{order['name']}</b>
-"
-
-        f"🔢 Telegram ID՝ "
-        f"<code>{user_id}</code>
-
-"
-
-        f"🎮 Խաղ՝ "
-        f"<b>{GAME_NAMES[order['game']]}</b>
-"
-
-        f"🎁 Ապրանք՝ "
-        f"<b>{order['product']}</b>
-"
-
-        f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-"
-
-        f"💳 Վճարում՝ "
-        f"<b>{order.get('payment_method', '-')}</b>
-"
-
-        f"🎮 Game ID՝ "
-        f"<code>{order.get('game_id', '-')}</code>
-
-"
-
-        "❌ Կարգավիճակ՝ <b>Չի տրամադրվել</b>",
-
-        parse_mode="HTML"
+    await send_order_status_to_channel(
+        order,
+        user_id,
+        "❌ Չի տրամադրվել"
     )
 
+    # =====================================================
     # КЛИЕНТУ
+    # =====================================================
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -1028,14 +941,10 @@ async def admin_not_given(callback: CallbackQuery):
 
     await bot.send_message(
         user_id,
-        "❌ <b>Պատվերը չի տրամադրվել։</b>
 
-"
+        "❌ <b>Պատվերը չի տրամադրվել։</b>\n\n"
 
-        f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-
-"
+        f"💰 Գումար՝ <b>{order['price']} ֏</b>\n\n"
 
         "Ընտրեք վերադարձի տարբերակը 👇",
 
@@ -1043,12 +952,63 @@ async def admin_not_given(callback: CallbackQuery):
         parse_mode="HTML"
     )
 
-    await callback.message.edit_reply_markup(
-        reply_markup=None
-    )
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     await callback.answer(
         "❌ Պատվերը նշվեց որպես չտրամադրված"
+    )
+
+
+# =========================================================
+# ОТПРАВКА СТАТУСА ЗАКАЗА В КАНАЛ
+# =========================================================
+
+async def send_order_status_to_channel(
+    order,
+    user_id,
+    status_text
+):
+
+    text = (
+        "📦 <b>СТАТУС ПАТВԵՐԻ</b>\n\n"
+
+        f"🆔 Պատվեր՝ "
+        f"<b>#{order.get('number', '-')}</b>\n"
+
+        f"👤 Հաճախորդ՝ "
+        f"<b>{order.get('name', '-')}</b>\n"
+
+        f"🔢 Telegram ID՝ "
+        f"<code>{user_id}</code>\n\n"
+
+        f"🎮 Խաղ՝ "
+        f"<b>{GAME_NAMES.get(order.get('game'), '-')}</b>\n"
+
+        f"🎁 Ապրանք՝ "
+        f"<b>{order.get('product', '-')}</b>\n"
+
+        f"💰 Գումար՝ "
+        f"<b>{order.get('price', '-')} ֏</b>\n"
+
+        f"💳 Վճարում՝ "
+        f"<b>{order.get('payment_method', '-')}</b>\n"
+
+        f"🎮 Game ID՝ "
+        f"<code>{order.get('game_id', '-')}</code>\n\n"
+
+        f"📌 Կարգավիճակ՝ "
+        f"<b>{status_text}</b>"
+    )
+
+    await bot.send_message(
+        CHANNEL_ID,
+        text,
+        parse_mode="HTML"
     )
 
 
@@ -1064,33 +1024,33 @@ async def refund_phone(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
 
         if user_id != callback.from_user.id:
+
             await callback.answer(
                 "❌ Մուտքը արգելված է։",
                 show_alert=True
             )
+
             return
 
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["refund_method"] = "phone"
     order["status"] = "waiting_refund_phone"
 
     await callback.message.edit_text(
-        "📱 <b>Վերադարձ հեռախոսահամարին</b>
-
-"
+        "📱 <b>Վերադարձ հեռախոսահամարին</b>\n\n"
 
         "Գումարը կվերադարձվի նշված "
-        "հեռախոսահամարին։
-
-"
+        "հեռախոսահամարին։\n\n"
 
         "📝 Ուղարկեք հեռախոսահամարը։",
 
@@ -1112,33 +1072,33 @@ async def refund_card(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
 
         if user_id != callback.from_user.id:
+
             await callback.answer(
                 "❌ Մուտքը արգելված է։",
                 show_alert=True
             )
+
             return
 
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["refund_method"] = "card"
     order["status"] = "waiting_refund_card"
 
     await callback.message.edit_text(
-        "💳 <b>Վերադարձ քարտին</b>
-
-"
+        "💳 <b>Վերադարձ քարտին</b>\n\n"
 
         "Ուղարկեք միայն անհրաժեշտ տվյալը "
-        "փոխանցումը ստանալու համար։
-
-"
+        "փոխանցումը ստանալու համար։\n\n"
 
         "⚠️ PIN, CVV/CVC կամ բանկային "
         "գաղտնաբառ մի ուղարկեք։",
@@ -1182,33 +1142,25 @@ async def send_refund_to_admin(user_id):
     await bot.send_message(
         ADMIN_ID,
 
-        "💰 <b>ՆՈՐ ՎԵՐԱԴԱՐՁ</b>
-
-"
+        "💰 <b>ՆՈՐ ՎԵՐԱԴԱՐՁ</b>\n\n"
 
         f"👤 Հաճախորդ՝ "
-        f"<b>{order['name']}</b>
-"
+        f"<b>{order['name']}</b>\n"
 
         f"🆔 Telegram ID՝ "
-        f"<code>{user_id}</code>
-"
+        f"<code>{user_id}</code>\n"
 
         f"🎮 Խաղ՝ "
-        f"<b>{GAME_NAMES[order['game']]}</b>
-"
+        f"<b>{GAME_NAMES[order['game']]}</b>\n"
 
         f"🎁 Ապրանք՝ "
-        f"<b>{order['product']}</b>
-"
+        f"<b>{order['product']}</b>\n"
 
         f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-"
+        f"<b>{order['price']} ֏</b>\n"
 
         f"📌 Եղանակ՝ "
-        f"<b>{method}</b>
-"
+        f"<b>{method}</b>\n"
 
         f"📄 Տվյալ՝ "
         f"<code>{order['refund_data']}</code>",
@@ -1226,20 +1178,24 @@ async def send_refund_to_admin(user_id):
 async def refund_done(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "refunded"
@@ -1247,23 +1203,22 @@ async def refund_done(callback: CallbackQuery):
     await bot.send_message(
         user_id,
 
-        "✅ <b>Վերադարձը կատարված է։</b>
-
-"
+        "✅ <b>Վերադարձը կատարված է։</b>\n\n"
 
         f"💰 Գումար՝ "
-        f"<b>{order['price']} ֏</b>
-
-"
+        f"<b>{order['price']} ֏</b>\n\n"
 
         "❤️ Շնորհակալություն Games Vault Shop-ից օգտվելու համար։",
 
         parse_mode="HTML"
     )
 
-    await callback.message.edit_reply_markup(
-        reply_markup=None
-    )
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     await callback.answer(
         "💰 Վերադարձը հաստատվեց"
@@ -1278,20 +1233,24 @@ async def refund_done(callback: CallbackQuery):
 async def refund_reject(callback: CallbackQuery):
 
     if callback.from_user.id != ADMIN_ID:
+
         await callback.answer(
             "❌ Մուտքը արգելված է։",
             show_alert=True
         )
+
         return
 
     user_id = int(callback.data.split(":")[1])
     order = orders.get(user_id)
 
     if not order:
+
         await callback.answer(
             "❌ Պատվերը չի գտնվել։",
             show_alert=True
         )
+
         return
 
     order["status"] = "refund_rejected"
@@ -1299,18 +1258,19 @@ async def refund_reject(callback: CallbackQuery):
     await bot.send_message(
         user_id,
 
-        "❌ <b>Վերադարձի հայտը մերժվել է։</b>
-
-"
+        "❌ <b>Վերադարձի հայտը մերժվել է։</b>\n\n"
 
         "Խնդրում ենք կապվել ադմինիստրատորի հետ։",
 
         parse_mode="HTML"
     )
 
-    await callback.message.edit_reply_markup(
-        reply_markup=None
-    )
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     await callback.answer(
         "❌ Վերադարձը մերժվեց"
@@ -1318,16 +1278,14 @@ async def refund_reject(callback: CallbackQuery):
 
 
 # =========================================================
-# НАЗАД
+# НАЗАД — ГЛАВНОЕ МЕНЮ
 # =========================================================
 
 @dp.callback_query(F.data == "back_main")
 async def back_main(callback: CallbackQuery):
 
     await callback.message.edit_text(
-        "🎮 <b>GAMES VAULT SHOP</b>
-
-"
+        "🎮 <b>GAMES VAULT SHOP</b> ❤️‍🔥\n\n"
         "Ընտրեք խաղը 👇",
 
         reply_markup=main_menu(),
