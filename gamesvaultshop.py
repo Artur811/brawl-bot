@@ -573,6 +573,9 @@ async def main():
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
     logging.info("HTTP health server started on 0.0.0.0:%s", PORT)
+ 
+    await bot.delete_webhook(drop_pending_updates=True)
+    
     await dp.start_polling(bot)
 
 
