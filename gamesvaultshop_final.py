@@ -30,6 +30,7 @@ def product_kb(g): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardB
 def pay_kb(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Վճարել եմ",callback_data="paid")],[InlineKeyboardButton(text="💳 Քարտ տրամադրել — հասանելի չէ",callback_data="card")],[InlineKeyboardButton(text="⬅️ Հետ",callback_data="bp")]])
 def receipt_kb(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ",callback_data="bpay")]])
 def order_kb(uid): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Ընդունել չեկը",callback_data=f"ok:{uid}")],[InlineKeyboardButton(text="❌ Մերժել չեկը",callback_data=f"no:{uid}")],[InlineKeyboardButton(text="💸 Վերադարձ կատարել",callback_data=f"ref:{uid}")]])
+def donut_kb(uid): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Հաստատել դոնաթը",callback_data=f"donut:{uid}")]])
 def refund_kb(uid): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💳 Վերադարձ քարտին",callback_data=f"rc:{uid}")],[InlineKeyboardButton(text="📱 Վերադարձ հեռախոսահամարին",callback_data=f"rp:{uid}")]])
 def done_kb(uid,m): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Վերադարձը կատարված է",callback_data=f"rd:{m}:{uid}")]])
 
@@ -65,7 +66,11 @@ async def receipt(m:Message):
 @dp.callback_query(F.data.startswith("ok:"))
 async def ok(c:CallbackQuery):
  if c.from_user.id!=ADMIN_ID: await c.answer("❌ Թույլտվություն չկա։",show_alert=True); return
- uid=int(c.data[3:]); U(uid)["state"]="accepted"; await bot.send_message(uid,"✅ <b>Չեկը ընդունված է։</b> Պատվերը հաստատվեց։",parse_mode="HTML"); await c.answer("✅ Ընդունված է։")
+ uid=int(c.data[3:]); U(uid)["state"]="accepted"; await c.message.edit_caption(caption=(c.message.caption or "")+"\n\n✅ <b>Չեկը ընդունված է</b>",parse_mode="HTML",reply_markup=donut_kb(uid)); await c.answer("✅ Չեկը ընդունվեց։ Հաստատեք դոնաթը։")
+@dp.callback_query(F.data.startswith("donut:"))
+async def donut(c:CallbackQuery):
+ if c.from_user.id!=ADMIN_ID: await c.answer("❌ Թույլտվություն չկա։",show_alert=True); return
+ uid=int(c.data[6:]); U(uid)["state"]="donut_confirmed"; await bot.send_message(uid,"✅ <b>Դոնաթը հաստատվել և ուղարկվել է։</b>\n\n🙏 Շնորհակալություն մեր խանութից օգտվելու համար ❤️‍🔥\n💎 <b>Games Vault Shop-ում՝ միշտ VAULT-Ա!</b>",parse_mode="HTML"); await c.message.edit_caption(caption=(c.message.caption or "")+"\n\n✅ <b>Դոնաթը հաստատված է և ուղարկված</b>",parse_mode="HTML",reply_markup=None); await c.answer("✅ Դոնաթը հաստատվեց։")
 @dp.callback_query(F.data.startswith("no:"))
 async def no(c:CallbackQuery):
  if c.from_user.id!=ADMIN_ID: await c.answer("❌ Թույլտվություն չկա։",show_alert=True); return
@@ -77,7 +82,7 @@ async def ref(c:CallbackQuery):
 @dp.callback_query(F.data.startswith("rc:"))
 async def rc(c:CallbackQuery):
  if c.from_user.id!=ADMIN_ID: await c.answer("❌ Թույլտվություն չկա։",show_alert=True); return
- uid=int(c.data[3:]); U(uid)["state"]="refund_card"; await c.message.edit_text("💳 <b>Վերադարձ քարտին</b>\n\nԳումարը փոխանցեք քարտին, ապա սեղմեք кнопку ниже։",reply_markup=done_kb(uid,"card"),parse_mode="HTML"); await bot.send_message(uid,"💳 Վերադարձը կատարվում է քարտին։",parse_mode="HTML"); await c.answer()
+ uid=int(c.data[3:]); U(uid)["state"]="refund_card"; await c.message.edit_text("💳 <b>Վերադարձ քարտին</b>\n\nԳումարը փոխանցեք քարտին, ապա սեղմեք կոճակը ներքևում։",reply_markup=done_kb(uid,"card"),parse_mode="HTML"); await bot.send_message(uid,"💳 Վերադարձը կատարվում է քարտին։",parse_mode="HTML"); await c.answer()
 @dp.callback_query(F.data.startswith("rp:"))
 async def rp(c:CallbackQuery):
  if c.from_user.id!=ADMIN_ID: await c.answer("❌ Թույլտվություն չկա։",show_alert=True); return
