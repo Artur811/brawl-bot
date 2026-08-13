@@ -28,6 +28,8 @@ ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", CHANNEL_ID)
 TELCELL_NUMBER = os.getenv("TELCELL_NUMBER", "043055510")
 PORT = int(os.getenv("PORT", "10000"))
 
+# Games Vault Shop: небольшая проверочная правка.
+
 if not BOT_TOKEN:
     raise RuntimeError(
         "BOT_TOKEN не найден. Добавь BOT_TOKEN в Environment Variables Render."
