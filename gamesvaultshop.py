@@ -172,6 +172,9 @@ def main_menu_keyboard():
             [
                 InlineKeyboardButton(text="🎫 Brawl Pass", callback_data="game:brawlpass"),
             ],
+            [
+                InlineKeyboardButton(text="📩 Կապվեք մեզ հետ", callback_data="contact:open"),
+            ],
         ]
     )
 
@@ -396,7 +399,7 @@ async def buy_confirm(callback: CallbackQuery):
 @dp.callback_query(F.data == "card:unavailable")
 async def card_unavailable(callback: CallbackQuery):
     await callback.answer(
-        "💳 Քարտով վճարումը դեռ հասանելի չէ։ Վճարիր Telcell Wallet-ով։",
+        "💳 Քարտ տրամադրել՝ հասանելի չէ։",
         show_alert=True,
     )
 
@@ -404,32 +407,16 @@ async def card_unavailable(callback: CallbackQuery):
 @dp.callback_query(F.data == "payment:done")
 async def payment_done(callback: CallbackQuery):
     user = get_user(callback.from_user.id)
-
-    if not user["product"]:
-        await callback.answer("❌ Ապրանքը ընտրված չէ։", show_alert=True)
-        return
-
     user["payment"] = "waiting_receipt"
 
-    text = (
-        "🧾 <b>Ուղարկիր վճարման չեկը</b>\n\n"
-        f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
-        f"💰 Գին՝ <b>{user['price']:,} ֏</b>\n\n"
-        "Ուղարկիր Telcell-ի վճարման չեկի նկարը այս չաթում։\n\n"
-        "❗ Չեկը պետք է լինի ամբողջությամբ տեսանելի։"
-    ).replace(",", " ")
-
     await callback.message.edit_text(
-        text,
+        "🧾 <b>Ուղարկիր չեկը</b>\n\n"
+        "Ուղարկիր այստեղ վճարման չեկի լուսանկարը։\n\n"
+        "⬅️ Եթե ուզում ես վերադառնալ, սեղմիր «Հետ»։",
         reply_markup=receipt_keyboard(),
         parse_mode="HTML",
     )
     await callback.answer()
-
-
-# =========================================================
-# RECEIPT PHOTO
-# =========================================================
 
 
 @dp.message(F.photo)
@@ -437,369 +424,35 @@ async def receive_receipt(message: Message):
     user = get_user(message.from_user.id)
 
     if user.get("payment") != "waiting_receipt":
-        await message.answer(
-            "❗ Սկզբում ընտրիր ապրանքը և անցիր Telcell Wallet վճարմանը։",
-            reply_markup=main_menu_keyboard(),
-        )
         return
 
-    photo = message.photo[-1]
-    order_id = f"{message.from_user.id}-{message.message_id}"
-
-    user["order_id"] = order_id
-    user["payment"] = "waiting_admin"
+    user["payment"] = "receipt_sent"
     user["username"] = message.from_user.username
 
-    username = (
-        f"@{message.from_user.username}"
-        if message.from_user.username
-        else "չկա"
-    )
-
-    admin_text = (
-        "🛎 <b>ՆՈՐ ՊԱՏՎԵՐ</b>\n\n"
-        f"🆔 Order ID՝ <code>{escape(order_id)}</code>\n"
-        f"👤 User ID՝ <code>{message.from_user.id}</code>\n"
-        f"👤 Username՝ {escape(username)}\n\n"
-        f"🎮 Խաղ՝ <b>{escape(CATALOG[user['game']]['name'])}</b>\n"
-        f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
-        f"💰 Գին՝ <b>{user['price']:,} ֏</b>\n\n"
-        "🧾 Վճարման չեկը կցված է։"
+    caption = (
+        "🧾 <b>Նոր չեկ</b>\n\n"
+        f"👤 Օգտատեր՝ @{escape(message.from_user.username or 'չկա')}\n"
+        f"🆔 ID՝ <code>{message.from_user.id}</code>\n"
+        f"🎮 Խաղ՝ {escape(CATALOG[user['game']]['name'])}\n"
+        f"📦 Ապրանք՝ {escape(user['product'])}\n"
+        f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n"
     ).replace(",", " ")
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Հաստատել",
-                    callback_data=f"order:approve:{order_id}",
-                ),
-                InlineKeyboardButton(
-                    text="❌ Մերժել",
-                    callback_data=f"order:reject:{order_id}",
-                ),
-            ]
-        ]
+    target = ORDER_CHANNEL_ID or ADMIN_ID
+    await bot.send_photo(
+        chat_id=target,
+        photo=message.photo[-1].file_id,
+        caption=caption,
+        parse_mode="HTML",
     )
-
-    if ADMIN_ID:
-        try:
-            await bot.send_photo(
-                chat_id=ADMIN_ID,
-                photo=photo.file_id,
-                caption=admin_text,
-                reply_markup=keyboard,
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logging.exception("Ошибка отправки чека админу: %s", e)
-    else:
-        logging.warning("ADMIN_ID не задан — чек не отправлен админу.")
-
-    if ORDER_CHANNEL_ID:
-        try:
-            await bot.send_photo(
-                chat_id=ORDER_CHANNEL_ID,
-                photo=photo.file_id,
-                caption=admin_text,
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logging.exception("Ошибка отправки заказа в канал: %s", e)
 
     await message.answer(
-        "✅ <b>Չեկը ստացվեց։</b>\n\n"
-        "Պատվերը ուղարկվել է ստուգման։\n"
-        "Խնդրում ենք սպասել հաստատմանը։",
+        "✅ Չեկը ստացվել է։\n\n"
+        "Սպասիր մեր պատասխանին։",
         parse_mode="HTML",
     )
 
 
-# =========================================================
-# FIND ORDER
-# =========================================================
-
-
-def find_order(order_id: str):
-    for uid, data in users.items():
-        if data.get("order_id") == order_id:
-            return uid, data
-    return None, None
-
-
-# =========================================================
-# APPROVE ORDER
-# =========================================================
-
-
-@dp.callback_query(F.data.startswith("order:approve:"))
-async def approve_order(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Դու ադմին չես։", show_alert=True)
-        return
-
-    order_id = callback.data.split(":", 2)[2]
-    target_user_id, user = find_order(order_id)
-
-    if target_user_id is None:
-        await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
-        return
-
-    user["payment"] = "approved"
-
-    try:
-        await bot.send_message(
-            chat_id=target_user_id,
-            text=(
-                "✅ <b>Պատվերը հաստատվեց!</b>\n\n"
-                f"📦 {escape(user['product'])}\n"
-                f"💰 {user['price']:,} ֏\n\n"
-                "Շնորհակալություն Games Vault Shop-ը ընտրելու համար ❤️‍🔥"
-            ).replace(",", " "),
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logging.exception("Не удалось отправить подтверждение пользователю: %s", e)
-
-    try:
-        await callback.message.edit_caption(
-            caption=(
-                "✅ <b>ՊԱՏՎԵՐԸ ՀԱՍՏԱՏՎԱԾ Է</b>\n\n"
-                f"🆔 Order ID՝ <code>{escape(order_id)}</code>\n"
-                f"📦 {escape(user['product'])}\n"
-                f"💰 {user['price']:,} ֏"
-            ).replace(",", " "),
-            parse_mode="HTML",
-            reply_markup=None,
-        )
-    except Exception:
-        pass
-
-    await callback.answer("✅ Պատվերը հաստատվեց։")
-
-
-# =========================================================
-# REJECT ORDER
-# =========================================================
-
-
-@dp.callback_query(F.data.startswith("order:reject:"))
-async def reject_order(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Դու ադմին չես։", show_alert=True)
-        return
-
-    order_id = callback.data.split(":", 2)[2]
-    target_user_id, user = find_order(order_id)
-
-    if target_user_id is None:
-        await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
-        return
-
-    user["payment"] = "rejected"
-
-    try:
-        await bot.send_message(
-            chat_id=target_user_id,
-            text=(
-                "❌ <b>Պատվերը մերժվեց</b>\n\n"
-                f"📦 {escape(user['product'])}\n"
-                f"💰 {user['price']:,} ֏\n\n"
-                "Խնդրում ենք կապվել Games Vault Shop-ի հետ։"
-            ).replace(",", " "),
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logging.exception("Не удалось отправить отказ пользователю: %s", e)
-
-    try:
-        await callback.message.edit_caption(
-            caption=(
-                "❌ <b>ՊԱՏՎԵՐԸ ՄԵՐԺՎԱԾ Է</b>\n\n"
-                f"🆔 Order ID՝ <code>{escape(order_id)}</code>\n"
-                f"📦 {escape(user['product'])}\n"
-                f"💰 {user['price']:,} ֏"
-            ).replace(",", " "),
-            parse_mode="HTML",
-            reply_markup=None,
-        )
-    except Exception:
-        pass
-
-    await callback.answer("❌ Պատվերը մերժվեց։")
-
-
-# =========================================================
-# BACK BUTTONS
-# =========================================================
-
-
-@dp.callback_query(F.data == "back:main")
-async def back_main(callback: CallbackQuery):
-    await callback.message.edit_text(
-        main_text(),
-        reply_markup=main_menu_keyboard(),
-        parse_mode="HTML",
-    )
+@dp.callback_query(F.data.startswith("back:"))
+async def back_handler(callback: CallbackQuery):
     await callback.answer()
-
-
-@dp.callback_query(F.data.startswith("back:game:"))
-async def back_game(callback: CallbackQuery):
-    game = callback.data.split(":", 2)[2]
-
-    if game not in CATALOG:
-        await callback.message.edit_text(
-            main_text(),
-            reply_markup=main_menu_keyboard(),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
-
-    user = get_user(callback.from_user.id)
-    user["game"] = game
-    user["product"] = None
-    user["price"] = None
-    user["payment"] = None
-    user["order_id"] = None
-
-    await callback.message.edit_text(
-        game_text(game),
-        reply_markup=game_keyboard(game),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "back:product")
-async def back_product(callback: CallbackQuery):
-    user = get_user(callback.from_user.id)
-    game = user.get("game")
-
-    if not game or game not in CATALOG or not user.get("product"):
-        await callback.message.edit_text(
-            main_text(),
-            reply_markup=main_menu_keyboard(),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
-
-    product = user["product"]
-    price = user["price"]
-
-    text = (
-        "🛒 <b>Ձեր ընտրությունը</b>\n\n"
-        f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n"
-        f"📦 Ապրանք՝ <b>{escape(product)}</b>\n"
-        f"💰 Գին՝ <b>{price:,} ֏</b>\n\n"
-        "Շարունակե՞լ պատվերը։"
-    ).replace(",", " ")
-
-    user["payment"] = None
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=product_keyboard(game),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "back:payment")
-async def back_payment(callback: CallbackQuery):
-    user = get_user(callback.from_user.id)
-
-    if not user.get("product"):
-        await callback.message.edit_text(
-            main_text(),
-            reply_markup=main_menu_keyboard(),
-            parse_mode="HTML",
-        )
-        await callback.answer()
-        return
-
-    user["payment"] = None
-
-    text = (
-        "💳 <b>Վճարում</b>\n\n"
-        f"📦 {escape(user['product'])}\n"
-        f"💰 <b>{user['price']:,} ֏</b>\n\n"
-        "Վճարումը կատարվում է միայն <b>Telcell Wallet</b>-ով։\n\n"
-        "💳 Քարտով վճարումը՝ <b>հասանելի չէ</b>։\n\n"
-        f"📱 Telcell Wallet՝ <code>{escape(TELCELL_NUMBER)}</code>\n\n"
-        "Վճարումից հետո սեղմիր «✅ Վճարել եմ» և ուղարկիր չեկը։"
-    ).replace(",", " ")
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=payment_keyboard(),
-        parse_mode="HTML",
-    )
-    await callback.answer()
-
-
-# =========================================================
-# ERROR HANDLER
-# =========================================================
-
-
-@dp.errors()
-async def global_error_handler(event):
-    logging.exception("Unhandled bot error: %s", event.exception)
-
-
-# =========================================================
-# START BOT
-# =========================================================
-
-
-# =========================================================
-# RENDER WEB SERVICE HEALTH SERVER
-# =========================================================
-
-async def health(request):
-    return web.Response(text="Games Vault Shop is running")
-
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", health)
-    app.router.add_get("/health", health)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-
-    logging.info("HTTP health server started on 0.0.0.0:%s", PORT)
-    return runner
-
-
-# =========================================================
-# START BOT
-# =========================================================
-
-async def main():
-    logging.info("Games Vault Shop bot starting...")
-
-    runner = await start_web_server()
-
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-
-        # Polling и HTTP-сервер работают одновременно.
-        await dp.start_polling(bot)
-
-    finally:
-        await runner.cleanup()
-        await bot.session.close()
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logging.info("Bot stopped.")
