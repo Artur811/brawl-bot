@@ -30,26 +30,6 @@ BRAWL_PASS_PRICES = {
     "brawl_pass_plus": (3400, 4800),
 }
 
-
-def get_user(user_id: int):
-    if user_id not in users:
-        users[user_id] = {
-            "game": None,
-            "product": None,
-            "price": None,
-            "username": None,
-            "payment": None,
-            "order_id": None,
-            "support_waiting": False,
-            "brawl_pass_type": None,
-            "brawl_pass_waiting": False,
-            "receipt_waiting_id": False,
-            "receipt_order_message_id": None,
-            "receipt_accepted": False,
-        }
-    return users[user_id]
-
-
 CATALOG = {
     "roblox": {"name": "🎮 Roblox", "items": [
         ("40 Robux", 350), ("80 Robux", 650), ("120 Robux", 950),
@@ -79,6 +59,18 @@ CATALOG = {
 }
 
 
+def get_user(user_id: int):
+    if user_id not in users:
+        users[user_id] = {
+            "game": None, "product": None, "price": None, "username": None,
+            "payment": None, "order_id": None, "support_waiting": False,
+            "brawl_pass_type": None, "brawl_pass_waiting": False,
+            "receipt_waiting_id": False, "receipt_order_message_id": None,
+            "receipt_accepted": False,
+        }
+    return users[user_id]
+
+
 def fmt_price(value: int) -> str:
     return f"{value:,}".replace(",", " ")
 
@@ -95,9 +87,9 @@ def game_keyboard(game: str):
     buttons = []
     for index, (name, price) in enumerate(CATALOG[game]["items"]):
         if game == "brawlstars" and name == "Brawl Pass":
-            text = "🎫 Brawl Pass — սկսած 2 500 ֏"
+            text = "🎫 Brawl Pass — 2 500 / 3 400 ֏"
         elif game == "brawlstars" and name == "Brawl Pass+":
-            text = "⭐ Brawl Pass+ — սկսած 3 400 ֏"
+            text = "⭐ Brawl Pass+ — 3 400 / 4 800 ֏"
         else:
             text = f"⚡ {name} — {fmt_price(price)} ֏"
         buttons.append([InlineKeyboardButton(text=text, callback_data=f"product:{game}:{index}")])
@@ -141,14 +133,8 @@ def admin_pass_price_keyboard(user_id: int, pass_type: str):
 
 def admin_receipt_keyboard(user_id: int):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="❌ Отклонить чек", callback_data=f"receipt:reject:{user_id}"),
-            InlineKeyboardButton(text="✅ Принять чек", callback_data=f"receipt:accept:{user_id}"),
-        ],
-        [
-            InlineKeyboardButton(text="📦 Подтвердить заказ", callback_data=f"receipt:confirm:{user_id}"),
-            InlineKeyboardButton(text="↩️ Назад", callback_data=f"receipt:back:{user_id}"),
-        ],
+        [InlineKeyboardButton(text="❌ Отклонить чек", callback_data=f"receipt:reject:{user_id}"), InlineKeyboardButton(text="✅ Принять чек", callback_data=f"receipt:accept:{user_id}")],
+        [InlineKeyboardButton(text="📦 Подтвердить заказ", callback_data=f"receipt:confirm:{user_id}"), InlineKeyboardButton(text="↩️ Назад", callback_data=f"receipt:back:{user_id}")],
     ])
 
 
@@ -259,12 +245,10 @@ async def text_router(message: Message):
         if not ORDER_CHANNEL_ID:
             await message.answer("❌ Պատվերների ալիքը կարգավորված չէ։")
             return
-
         user["receipt_waiting_id"] = False
         user["payment"] = "receipt_received"
         order_id = user.get("order_id") or f"{message.from_user.id}-{message.message_id}"
         user["order_id"] = order_id
-
         await bot.send_message(
             chat_id=ORDER_CHANNEL_ID,
             text=(
@@ -272,41 +256,27 @@ async def text_router(message: Message):
                 f"👤 Username՝ @{escape(message.from_user.username or 'չկա')}\n"
                 f"🆔 ID՝ <code>{escape(client_id)}</code>\n"
                 f"🔖 Պատվեր՝ <code>{escape(order_id)}</code>"
-            ),
-            parse_mode="HTML",
+            ), parse_mode="HTML",
         )
-
         receipt_message_id = user.get("receipt_order_message_id")
         if receipt_message_id:
             try:
-                await bot.edit_message_reply_markup(
-                    chat_id=ORDER_CHANNEL_ID,
-                    message_id=receipt_message_id,
-                    reply_markup=admin_receipt_keyboard(message.from_user.id),
-                )
+                await bot.edit_message_reply_markup(chat_id=ORDER_CHANNEL_ID, message_id=receipt_message_id, reply_markup=admin_receipt_keyboard(message.from_user.id))
             except Exception:
                 logging.exception("Could not add admin receipt buttons")
-
-        await message.answer(
-            "✅ <b>Ամբողջ տվյալները ստացվեցին։</b>\n\n⚡ Վճարումը ստուգվում է։",
-            reply_markup=main_menu_keyboard(),
-            parse_mode="HTML",
-        )
+        await message.answer("✅ <b>Ամբողջ տվյալները ստացվեցին։</b>\n\n⏳ Վճարումը ստուգվում է։", reply_markup=main_menu_keyboard(), parse_mode="HTML")
         return
 
     if not user.get("support_waiting") or not SUPPORT_CHANNEL_ID:
         return
-
-    username = message.from_user.username or "չկա"
     sent = await bot.send_message(
         chat_id=SUPPORT_CHANNEL_ID,
         text=(
             "📩 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n"
-            f"👤 Username՝ @{escape(username)}\n"
+            f"👤 Username՝ @{escape(message.from_user.username or 'չկա')}\n"
             f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n"
             f"💬 {escape(message.text)}"
-        ),
-        parse_mode="HTML",
+        ), parse_mode="HTML",
     )
     support_threads[sent.message_id] = message.from_user.id
     user["support_waiting"] = False
@@ -320,12 +290,7 @@ async def choose_game(callback: CallbackQuery):
         await callback.answer("❌ Սխալ խաղ։", show_alert=True)
         return
     user = get_user(callback.from_user.id)
-    user.update({
-        "game": game, "product": None, "price": None, "payment": None,
-        "order_id": None, "brawl_pass_type": None, "brawl_pass_waiting": False,
-        "receipt_waiting_id": False, "receipt_order_message_id": None,
-        "receipt_accepted": False,
-    })
+    user.update({"game": game, "product": None, "price": None, "payment": None, "order_id": None, "brawl_pass_type": None, "brawl_pass_waiting": False, "receipt_waiting_id": False, "receipt_order_message_id": None, "receipt_accepted": False})
     await callback.message.edit_text(game_text(game), reply_markup=game_keyboard(game), parse_mode="HTML")
     await callback.answer()
 
@@ -333,23 +298,13 @@ async def choose_game(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("product:"))
 async def choose_product(callback: CallbackQuery):
     _, game, index = callback.data.split(":")
-    if game not in CATALOG:
-        await callback.answer("❌ Սխալ խաղ։", show_alert=True)
-        return
     try:
         item = CATALOG[game]["items"][int(index)]
-    except (ValueError, IndexError):
+    except (KeyError, ValueError, IndexError):
         await callback.answer("❌ Սխալ ապրանք։", show_alert=True)
         return
-
     user = get_user(callback.from_user.id)
-    user.update({
-        "game": game, "product": item[0], "price": item[1],
-        "username": callback.from_user.username, "payment": None,
-        "order_id": None, "receipt_order_message_id": None,
-        "receipt_accepted": False,
-    })
-
+    user.update({"game": game, "product": item[0], "price": item[1], "username": callback.from_user.username, "payment": None, "order_id": None, "receipt_order_message_id": None, "receipt_accepted": False})
     if game == "brawlstars" and item[0] in {"Brawl Pass", "Brawl Pass+"}:
         user["brawl_pass_type"] = "brawl_pass" if item[0] == "Brawl Pass" else "brawl_pass_plus"
         user["brawl_pass_waiting"] = True
@@ -357,7 +312,6 @@ async def choose_product(callback: CallbackQuery):
         await callback.message.edit_text(brawl_pass_prompt(user["brawl_pass_type"]), reply_markup=pass_back_keyboard(), parse_mode="HTML")
         await callback.answer()
         return
-
     text = (
         "🛒 <b>Ձեր ընտրությունը</b>\n\n"
         f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n"
@@ -389,27 +343,12 @@ async def photo_router(message: Message):
             f"🔖 Պատվեր՝ <code>{escape(user['order_id'])}</code>\n\n"
             "📸 Ստուգիր screenshot-ը և ընտրիր ճիշտ գինը։"
         )
-        await bot.send_photo(
-            chat_id=ORDER_CHANNEL_ID,
-            photo=message.photo[-1].file_id,
-            caption=caption,
-            parse_mode="HTML",
-            reply_markup=admin_pass_price_keyboard(message.from_user.id, user["brawl_pass_type"]),
-        )
+        await bot.send_photo(chat_id=ORDER_CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption, parse_mode="HTML", reply_markup=admin_pass_price_keyboard(message.from_user.id, user["brawl_pass_type"]))
         await message.answer("✅ <b>Screenshot-ը ստացվեց։</b>\n\n👨‍💼 Ադմինը կստուգի գինը և կընտրի ճիշտ տարբերակը։", parse_mode="HTML")
         return
 
     if user.get("support_waiting") and SUPPORT_CHANNEL_ID:
-        sent = await bot.send_photo(
-            chat_id=SUPPORT_CHANNEL_ID,
-            photo=message.photo[-1].file_id,
-            caption=(
-                "📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n"
-                f"👤 Username՝ @{escape(message.from_user.username or 'չկա')}\n"
-                f"🆔 ID՝ <code>{message.from_user.id}</code>"
-            ),
-            parse_mode="HTML",
-        )
+        sent = await bot.send_photo(chat_id=SUPPORT_CHANNEL_ID, photo=message.photo[-1].file_id, caption=("📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n" f"👤 Username՝ @{escape(message.from_user.username or 'չկա')}\n" f"🆔 ID՝ <code>{message.from_user.id}</code>"), parse_mode="HTML")
         support_threads[sent.message_id] = message.from_user.id
         user["support_waiting"] = False
         await message.answer("✅ Նկարը ստացվեց։ Մենք կպատասխանենք շուտով։", reply_markup=main_menu_keyboard())
@@ -420,7 +359,6 @@ async def photo_router(message: Message):
     if not ORDER_CHANNEL_ID:
         await message.answer("❌ Պատվերների ալիքը կարգավորված չէ։")
         return
-
     user["payment"] = "awaiting_id"
     user["receipt_waiting_id"] = True
     user["order_id"] = user.get("order_id") or f"{message.from_user.id}-{message.message_id}"
@@ -452,11 +390,7 @@ async def admin_choose_pass_price(callback: CallbackQuery):
         return
     user["price"] = price
     pass_name = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
-    await callback.message.edit_caption(
-        caption=(f"🎫 <b>BRAWL PASS — ԳԻՆԸ ՀԱՍՏԱՏՎԱԾ Է</b>\n\n📦 Pass՝ <b>{pass_name}</b>\n💰 Ընտրված գին՝ <b>{fmt_price(price)} ֏</b>\n🆔 ID՝ <code>{user_id}</code>\n\n✅ Ադմինը ընտրեց գինը։"),
-        reply_markup=None,
-        parse_mode="HTML",
-    )
+    await callback.message.edit_caption(caption=(f"🎫 <b>BRAWL PASS — ԳԻՆԸ ՀԱՍՏԱՏՎԱԾ Է</b>\n\n📦 Pass՝ <b>{pass_name}</b>\n💰 Ընտրված գին՝ <b>{fmt_price(price)} ֏</b>\n🆔 ID՝ <code>{user_id}</code>\n\n✅ Ադմինը ընտրեց գինը."), reply_markup=None, parse_mode="HTML")
     await bot.send_message(chat_id=user_id, text=f"✅ <b>Գինը հաստատվեց</b>\n\n📦 {pass_name}\n💰 Գին՝ <b>{fmt_price(price)} ֏</b>\n\nՇարունակե՞լ պատվերը։", reply_markup=product_keyboard("brawlstars"), parse_mode="HTML")
     await callback.answer(f"Գինը՝ {fmt_price(price)} ֏")
 
@@ -473,10 +407,9 @@ async def buy_confirm(callback: CallbackQuery):
     await callback.message.edit_text(
         "💳 <b>Ընտրիր վճարման եղանակը</b>\n\n"
         f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
-        f"💰 Գումար՝ <b>{fmt_price(user['price'])} ֏</b>\n\nԸնտրիր՝ ինչպես ես ցանկանում վճարել։",
-        reply_markup=payment_keyboard(),
-        parse_mode="HTML",
-    )
+        f"💰 Գումար՝ <b>{fmt_price(user['price'])} ֏</b>\n\n"
+        "Ընտրիր՝ ինչպես ես ցանկանում վճարել։",
+        reply_markup=payment_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 
@@ -503,11 +436,7 @@ async def payment_done(callback: CallbackQuery):
         return
     user["payment"] = "receipt_pending"
     user["receipt_waiting_id"] = False
-    await callback.message.edit_text(
-        "🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]]),
-        parse_mode="HTML",
-    )
+    await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]]), parse_mode="HTML")
     await callback.answer()
 
 
@@ -530,9 +459,8 @@ async def admin_receipt_actions(callback: CallbackQuery):
     if action == "reject":
         user["payment"] = "receipt_rejected"
         user["receipt_accepted"] = False
-        await bot.send_message(chat_id=user_id, text="❌ <b>Չեկը մերժվեց։</b>\n\nԽնդրում ենք ուղարկել ճիշտ վճարման չեկ։", parse_mode="HTML")
-        await callback.message.edit_reply_markup(reply_markup=None)
-        await callback.answer("Չեկը մերժվեց։")
+        await bot.send_message(chat_id=user_id, text="❌ <b>Չեկը մերժվեց։</b>\n\nԽնդրում ենք կրկին ուղարկել ճիշտ վճարման չեկ։", parse_mode="HTML")
+        await callback.answer("❌ Չեկը մերժվեց։")
         return
 
     if action == "accept":
@@ -543,9 +471,8 @@ async def admin_receipt_actions(callback: CallbackQuery):
         return
 
     if action == "confirm":
-        if not user.get("receipt_accepted"):
-            await callback.answer("⚠️ Сначала нажми «Принять чек». ", show_alert=True)
-            return
+        # ВАЖНО: подтверждение заказа полностью независимо от кнопки «Принять чек».
+        # Это означает, что админ нажимает её, когда донат уже завершён.
         user["payment"] = "completed"
         await bot.send_message(
             chat_id=user_id,
@@ -553,16 +480,16 @@ async def admin_receipt_actions(callback: CallbackQuery):
                 "🎉 <b>Պատվերը հաստատվեց։</b>\n\n"
                 f"📦 Ապրանք՝ <b>{product}</b>\n"
                 f"💰 Գումար՝ <b>{fmt_price(price)} ֏</b>\n\n"
-                "⚡ Ձեր Դոնաթը կստանաք 1–2 րոպեում։ ❤️‍🔥"
-            ),
-            parse_mode="HTML",
-        )
+                "✅ Դոնաթը հաջողությամբ ավարտված է։ ❤️‍🔥"
+            ), parse_mode="HTML")
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer("📦 Պատվերը հաստատվեց։")
         return
 
     if action == "back":
-        await callback.answer("↩️ Վերադարձ։")
+        # «Назад» — отдельная кнопка. Она просто возвращает 4 кнопки управления.
+        await callback.message.edit_reply_markup(reply_markup=admin_receipt_keyboard(user_id))
+        await callback.answer("↩️ Կառավարման կոճակները վերադարձվեցին։")
         return
 
     await callback.answer("❌ Անհայտ գործողություն։", show_alert=True)
