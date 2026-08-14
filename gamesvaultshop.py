@@ -122,12 +122,23 @@ async def analyze_brawl_pass_image(file_bytes: bytes, pass_type: str):
         return None, "AI ծառայությունը դեռ միացված չէ։ Ավելացրու OPENAI_API_KEY-ը Render-ի Environment Variables-ում։"
     encoded = base64.b64encode(file_bytes).decode("utf-8")
     expected = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
-    prompt = f"""Դու Games Vault Shop-ի Brawl Stars Brawl Pass screenshot-ի ստուգիչ ես.
-Սքրինշոթը պետք է վերաբերի {expected}-ին։
-Որոշիր միայն՝ screenshot-ում երևո՞ւմ է հատուկ/զեղչված առաջարկ, թե՞ սովորական գին։
-Եթե վստահ չես, վերադարձիր unknown.
+    prompt = f"""Դու Games Vault Shop-ի Brawl Stars {expected} screenshot-ի ստուգիչ ես։
+Քո խնդիրն է որոշել՝ օգտատիրոջ screenshot-ում տվյալ {expected}-ի համար կա՞ հատուկ/զեղչված առաջարկ։
+
+ՀԱՏԿԱՊԵՍ ՀԱՄԱՐԻՐ ԶԵՂՉՎԱԾ (discounted), եթե screenshot-ում տեսնում ես թեկուզ մեկը՝
+- «АКЦИЯ», «ЛУЧШАЯ АКЦИЯ», «SALE», «SPECIAL OFFER», «OFFER» կամ նման նշում հատուկ առաջարկի մասին;
+- հատուկ/ակցիոն оформление Brawl Pass-ի կամ Brawl Pass+-ի համար;
+- ակնհայտ հատուկ առաջարկ կամ зниженная/акционная цена;
+- на экране есть две цены/вариants, где один вариант является специальным предложением;
+- любой другой явный признак, что это не обычная покупка, а акция/специальное предложение.
+
+Например, screenshot с надписью «ЛУЧШАЯ АКЦИЯ BRAWL STARS!» и ценой Brawl Pass/ Brawl Pass+ — это discounted.
+
+ՀԱՄԱՐԻՐ regular միայն այն դեպքում, երբ screenshot-ը հստակ ցույց է տալիս սովորական գին և հատուկ առաջարկի ոչ մի նշան չկա։
+Եթե screenshot-ը չի վերաբերում Brawl Pass-ին կամ Brawl Pass+-ին, կամ պատկերը չափազանց անընթեռնելի է, վերադարձիր unknown։
+
 Պատասխանիր ՄԻԱՅՆ մեկ բառով՝ discounted, regular կամ unknown.
-Մի փորձիր որոշել վճարման կամ չեկի վավերությունը."""
+Մի փորձիր որոշել վճարման կամ չեկի վավերությունը։"""
     try:
         response = await ai_client.responses.create(
             model=OPENAI_MODEL,
@@ -290,7 +301,7 @@ async def buy_confirm(callback: CallbackQuery):
     if not user.get("game") or not user.get("product"):
         await callback.answer("❌ Նախ ընտրիր ապրանքը։", show_alert=True)
         return
-    text = ("💳 <b>Ընտրիր վճարման եղանակը</b>\n\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" "Ընտրիր՝ ինչպես ես ցանկանում վճարել։").replace(",", " ")
+    text = ("💳 <b>Վճարում</b>\n\n" f"📦 {escape(user['product'])}\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" f"Telcell Wallet\n📱 Համար՝ <code>{escape(TELCELL_NUMBER)}</code>\n\n" "Telcell տերմինալով ընտրեք «Telcell Wallet» տարբերակը և գրեք հեռախոսահամարը։\n\n" "❗ Վճարումից հետո ուղարկեք չեկը.").replace(",", " ")
     await callback.message.edit_text(text, reply_markup=payment_keyboard(), parse_mode="HTML")
     await callback.answer()
 
@@ -302,14 +313,12 @@ async def payment_card(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "payment:cash")
 async def payment_cash(callback: CallbackQuery):
-    text = ("💎 <b>Games Vault Shop-ից Բարևներ</b> ❤️‍🔥\n\n"
-            "💵 <b>Վճարման քայլերը՝</b>\n\n"
-            "1️⃣ Telcell տերմինալում ընտրեք <b>«Telcell Wallet»</b> և մուտքագրեք հեռախոսահամարը՝ <code>043055510</code> 📱\n\n"
-            "2️⃣ Կատարեք վճարումը անհրաժեշտ գումարի չափով։ 💰\n\n"
-            "3️⃣ 🧾 Վճարումից հետո <b>նկարեք չեկը</b> և ուղարկեք մեզ։\n\n"
-            "4️⃣ 🆔 Այնուհետև ուղարկեք ձեր <b>ID-ն</b>։\n\n"
-            "⚡ Վճարումը ստանալուց և ստուգելուց հետո <b>1–2 րոպեում</b> կստանաք ձեր Դոնաթը։ ❤️‍🔥\n\n"
-            "🧾 <b>Ուղարկիր չեկի նկարը</b>")
+    user = get_user(callback.from_user.id)
+    if not user.get("product"):
+        await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
+        return
+    text = ("💵 <b>Վճարում կանխիկ</b>\n\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" "📍 Կանխիկ վճարումը հասանելի է։\n\n" "❗ Վճարումից հետո սեղմեք «Ուղարկել չեկի նկարը»։").replace(",", " ")
+    user["payment"] = "receipt_pending"
     await callback.message.edit_text(text, reply_markup=receipt_keyboard(), parse_mode="HTML")
     await callback.answer()
 
@@ -321,7 +330,7 @@ async def payment_done(callback: CallbackQuery):
         await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
         return
     user["payment"] = "receipt_pending"
-    await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text("🧾 <b>Ուղարկիր վճարման չեկը</b>\n\nՈւղարկիր չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 
