@@ -36,6 +36,13 @@ BRAWL_PASS_PRICES = {
     "brawl_pass_plus": {True: 3400, False: 4800},
 }
 
+# Սովորական Brawl Stars գները, որոնց հետ համեմատվում է հենց ընտրված Pass-ը։
+# «Լավագույն ակցիա» կամ այլ գովազդային տեքստը հաշվի չի առնվում։
+BRAWL_STANDARD_USD = {
+    "brawl_pass": 6.99,
+    "brawl_pass_plus": 9.99,
+}
+
 
 def get_user(user_id: int):
     if user_id not in users:
@@ -76,7 +83,10 @@ def game_keyboard(game: str):
 
 
 def product_keyboard(game: str):
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Գնել", callback_data="buy:confirm")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"back:game:{game}")]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Գնել", callback_data="buy:confirm")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"back:game:{game}")],
+    ])
 
 
 def payment_keyboard():
@@ -88,15 +98,28 @@ def payment_keyboard():
 
 
 def receipt_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🧾 Ուղարկել չեկի նկարը", callback_data="payment:done")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧾 Ուղարկել չեկի նկարը", callback_data="payment:done")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")],
+    ])
 
 
 def pass_result_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Ուղարկել նոր screenshot", callback_data="pass:retry")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Ուղարկել նոր screenshot", callback_data="pass:retry")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")],
+    ])
 
 
 def main_text():
-    return ("🎮 <b>Games Vault Shop</b> ❤️‍🔥\n\n" "💎 <b>Games Vault Shop-ում՝ միշտ VAULT-Ա!</b>\n\n" "Ընտրիր խաղը և տես հասանելի ապրանքները։\n\n" "⚡ Արագ պատվեր\n" "💳 Telcell Wallet\n" "🧾 Չեկի ստուգում\n" "📩 Աջակցություն և կապ\n\n" "❗ Գնումից առաջ ստուգիր ապրանքի տեսակը և գինը։")
+    return ("🎮 <b>Games Vault Shop</b> ❤️‍🔥\n\n"
+            "💎 <b>Games Vault Shop-ում՝ միշտ VAULT-Ա!</b>\n\n"
+            "Ընտրիր խաղը և տես հասանելի ապրանքները։\n\n"
+            "⚡ Արագ պատվեր\n"
+            "💳 Telcell Wallet\n"
+            "🧾 Չեկի ստուգում\n"
+            "📩 Աջակցություն և կապ\n\n"
+            "❗ Գնումից առաջ ստուգիր ապրանքի տեսակը և գինը։")
 
 
 def game_text(game: str):
@@ -105,16 +128,26 @@ def game_text(game: str):
 
 def order_caption(user_id: int, user: dict, status: str):
     username = user.get("username") or "չկա"
-    return ("🧾 <b>ՊԱՏՎԵՐ</b>\n\n" f"👤 Օգտատեր՝ @{escape(username)}\n" f"🆔 ID՝ <code>{user_id}</code>\n" f"🎮 Խաղ՝ <b>{escape(CATALOG[user['game']]['name'])}</b>\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n" f"🔖 Պատվեր՝ <code>{escape(user.get('order_id') or str(user_id))}</code>\n\n" f"{status}").replace(",", " ")
+    return ("🧾 <b>ՊԱՏՎԵՐ</b>\n\n"
+            f"👤 Օգտատեր՝ @{escape(username)}\n"
+            f"🆔 ID՝ <code>{user_id}</code>\n"
+            f"🎮 Խաղ՝ <b>{escape(CATALOG[user['game']]['name'])}</b>\n"
+            f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
+            f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n"
+            f"🔖 Պատվեր՝ <code>{escape(user.get('order_id') or str(user_id))}</code>\n\n"
+            f"{status}").replace(",", " ")
 
 
 def brawl_pass_prompt(pass_type: str):
     title = "🎫 Brawl Pass" if pass_type == "brawl_pass" else "⭐ Brawl Pass+"
-    return (f"{title}\n\n📸 <b>Ուղարկեք ձեր Brawl Pass-ի screenshot-ը։</b>\n\n"
-            "AI-ն կստուգի՝ ձեր аккаунտում կա՞ զեղչված գին։\n\n"
-            "🟢 Զեղչ կա → նվազագույն գին\n"
-            "🔴 Զեղչ չկա → առավելագույն գին\n\n"
-            "⚠️ Ուղարկեք ամբողջական և ընթեռնելի screenshot, որտեղ երևում է Brawl Pass-ի գինը։")
+    standard = BRAWL_STANDARD_USD[pass_type]
+    return (f"{title}\n\n"
+            "📸 <b>Ուղարկեք screenshot-ը ձեր Brawl Stars-ի Pass-ի գնով։</b>\n\n"
+            f"🔎 AI-ն կստուգի հենց <b>{title}</b>-ի ցուցադրված գինը։\n"
+            f"💵 Սովորական գինը՝ <b>${standard:.2f}</b>\n\n"
+            "🟢 Գինը ցածր է սովորականից → նվազագույն գին\n"
+            "🔴 Գինը սովորական է → առավելագույն գին\n\n"
+            "⚠️ «Լավագույն ակցիա» կամ այլ գովազդային գրությունը ինքնին զեղչ չի համարվում։ Կարևոր է հենց ընտրված Pass-ի գինը։")
 
 
 async def analyze_brawl_pass_image(file_bytes: bytes, pass_type: str):
@@ -123,54 +156,46 @@ async def analyze_brawl_pass_image(file_bytes: bytes, pass_type: str):
 
     encoded = base64.b64encode(file_bytes).decode("utf-8")
     expected = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
+    standard_price = BRAWL_STANDARD_USD[pass_type]
 
-    prompt = f"""Դու Games Vault Shop-ի Brawl Stars screenshot ստուգիչ ես։
-Օգտատերը ընտրել է՝ {expected}։
+    prompt = f"""Դու Games Vault Shop-ի Brawl Stars գնի ստուգիչ ես։
 
-Քո միակ խնդիրը՝ որոշել՝ այս screenshot-ում տվյալ ապրանքի համար կա՞ ԱԿՑԻԱ/ԶԵՂՉ, թե սովորական առաջարկ։
+Օգտատերը ընտրել է ՀԱՏԿԱՊԵՍ՝ {expected}։
+Սովորական գինը այս ապրանքի համար՝ ${standard_price:.2f} USD։
+
+Պետք է ստուգես ՄԻԱՅՆ ընտրված ապրանքի իրական ցուցադրված ԳԻՆԸ screenshot-ում։
+
+Եթե ընտրվածը Brawl Pass է՝ կարդա Brawl Pass-ի գինը, ոչ թե Brawl Pass+-ի գինը։
+Եթե ընտրվածը Brawl Pass+ է՝ կարդա Brawl Pass+-ի գինը, ոչ թե սովորական Brawl Pass-ի գինը։
 
 ԿԱՐԵՎՈՐ.
-1. Եթե screenshot-ում երևում է «АКЦИЯ», «ЛУЧШАЯ АКЦИЯ BRAWL STARS», «SALE», «SPECIAL OFFER», «OFFER» կամ ակնհայտ հատուկ առաջարկի оформление — ՊАРТИЯ/ОFFER-ը համարիր ЗЕՂՉՎԱԾ։
-2. Եթե տեսնում ես հատուկ ակցիոն баннер, promotional offer, discounted/special price կամ այլ ակնհայտ նշան, որ սա սովորական գին չէ — համարիր ЗԵՂՉՎԱԾ։
-3. Եթե screenshot-ում միաժամանակ երևում են Brawl Pass և Brawl Pass+ տարբերակները, դա ինքնին խնդիր չէ. ստուգիր՝ ընտրված {expected}-ը գտնվում է ակցիոն/հատուկ առաջարկի էջում։
-4. Օրինակ՝ «ЛУЧШАЯ АКЦИЯ BRAWL STARS!» գրությամբ screenshot-ը, որտեղ երևում են Brawl Pass/Brawl Pass+ գները, պետք է վերադարձնի discounted։
-5. «unknown» վերադարձիր միայն այն դեպքում, եթե screenshot-ը ընդհանրապես չի վերաբերում Brawl Pass-ին կամ պատկերը այնքան վատ է, որ ոչինչ հնարավոր չէ հասկանալ։
+- «ЛУЧШАЯ АКЦИЯ BRAWL STARS», «АКЦИЯ», SALE, SPECIAL OFFER և նման բառերը ինքնուրույն ՉԵՆ նշանակում զեղչ։
+- Նույնիսկ եթե այդ գրությունը կա, որոշումը արա հենց ընտրված Pass-ի թվային գնով։
+- Եթե ընտրված Pass-ի գինը ցածր է ${standard_price:.2f}-ից → discounted.
+- Եթե ընտրված Pass-ի գինը հավասար է կամ շատ մոտ է ${standard_price:.2f}-ին → regular.
+- Եթե գինը չի կարդացվում, ընտրված Pass-ը չի երևում կամ արժույթը/գինը անհասկանալի է → unknown.
+- Մի համեմատիր Brawl Pass-ի գինը Brawl Pass+-ի հետ և հակառակը.
 
-Պատասխանիր ՄԻԱՅՆ մեկ բառով՝
+Պատասխանիր ՄԻԱՅՆ մեկ բառով:
 discounted
-կամ
 regular
-կամ
 unknown"""
 
-    async def ask(extra_instruction: str = ""):
+    try:
         response = await ai_client.responses.create(
             model=OPENAI_MODEL,
             input=[{"role": "user", "content": [
-                {"type": "input_text", "text": prompt + ("\n\n" + extra_instruction if extra_instruction else "")},
+                {"type": "input_text", "text": prompt},
                 {"type": "input_image", "image_url": f"data:image/jpeg;base64,{encoded}"},
             ]}],
-            max_output_tokens=20,
+            max_output_tokens=10,
         )
-        return (response.output_text or "").strip().lower()
-
-    try:
-        result = await ask()
-
-        if any(word in result for word in ("discounted", "discount", "sale", "акция", "акцион", "զեղչ", "special offer")):
+        result = (response.output_text or "").strip().lower()
+        if result == "discounted" or "discounted" in result:
             return True, None
-        if any(word in result for word in ("regular", "обычная", "обычный", "սովորական")):
+        if result == "regular" or "regular" in result:
             return False, None
-
-        # Երկրորդ փորձ՝ հատուկ նման screenshot-ների համար։
-        if "unknown" in result or not result:
-            result2 = await ask("Վերջնական ստուգում․ եթե տեսնում ես ակցիոն/պրոմո էջ, հատուկ առաջարկի banner կամ «ЛУЧШАЯ АКЦИЯ BRAWL STARS!» նման նշում, պարտադիր պատասխանիր discounted։")
-            if any(word in result2 for word in ("discounted", "discount", "sale", "акция", "акцион", "զեղչ", "special offer")):
-                return True, None
-            if any(word in result2 for word in ("regular", "обычная", "обычный", "սովորական")):
-                return False, None
-
-        return None, "Screenshot-ը հստակ չհաջողվեց ճանաչել։ Ուղարկեք ավելի պարզ screenshot։"
+        return None, "Screenshot-ը հստակ չհաջողվեց ճանաչել։ Ուղարկեք ավելի պարզ screenshot, որտեղ ընտրված Pass-ի գինը ամբողջությամբ երևում է։"
     except Exception:
         logging.exception("Brawl Pass image analysis failed")
         return None, "Չհաջողվեց ստուգել screenshot-ը։ Փորձեք կրկին։"
@@ -198,7 +223,11 @@ async def contact_open(callback: CallbackQuery):
         return
     user = get_user(callback.from_user.id)
     user["support_waiting"] = True
-    await callback.message.edit_text("📩 <b>Կապ Games Vault Shop-ի հետ</b>\n\nԳրիր քո հարցը, խնդիրը կամ կարծիքը հաջորդ հաղորդագրությամբ։\nՄենք կստանանք այն և կպատասխանենք։", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]]), parse_mode="HTML")
+    await callback.message.edit_text(
+        "📩 <b>Կապ Games Vault Shop-ի հետ</b>\n\nԳրիր քո հարցը, խնդիրը կամ կարծիքը հաջորդ հաղորդագրությամբ։\nՄենք կստանանք այն և կպատասխանենք։",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]]),
+        parse_mode="HTML"
+    )
     await callback.answer()
 
 
@@ -208,7 +237,11 @@ async def text_router(message: Message):
     if not user.get("support_waiting") or not SUPPORT_CHANNEL_ID:
         return
     username = message.from_user.username or "չկա"
-    support_text = ("📩 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n" f"👤 Username՝ @{escape(username)}\n" f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n" f"💬 {escape(message.text)}\n\n" "↩️ Պատասխանեք այս հաղորդագրությանը՝ օգտատիրոջը ուղարկելու համար։")
+    support_text = ("📩 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n"
+                    f"👤 Username՝ @{escape(username)}\n"
+                    f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n"
+                    f"💬 {escape(message.text)}\n\n"
+                    "↩️ Պատասխանեք այս հաղորդագրությանը՝ օգտատիրոջը ուղարկելու համար։")
     sent = await bot.send_message(chat_id=SUPPORT_CHANNEL_ID, text=support_text, parse_mode="HTML")
     support_threads[sent.message_id] = message.from_user.id
     user["support_waiting"] = False
@@ -243,10 +276,18 @@ async def choose_product(callback: CallbackQuery):
     if game == "brawlstars" and item[0] in {"Brawl Pass", "Brawl Pass+"}:
         user["brawl_pass_type"] = "brawl_pass" if item[0] == "Brawl Pass" else "brawl_pass_plus"
         user["brawl_pass_analyzing"] = True
-        await callback.message.edit_text(brawl_pass_prompt(user["brawl_pass_type"]), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")]]), parse_mode="HTML")
+        await callback.message.edit_text(
+            brawl_pass_prompt(user["brawl_pass_type"]),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")]]),
+            parse_mode="HTML"
+        )
         await callback.answer()
         return
-    text = ("🛒 <b>Ձեր ընտրությունը</b>\n\n" f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n" f"📦 Ապրանք՝ <b>{escape(item[0])}</b>\n" f"💰 Գին՝ <b>{item[1]:,} ֏</b>\n\n" "Շարունակե՞լ պատվերը։").replace(",", " ")
+    text = ("🛒 <b>Ձեր ընտրությունը</b>\n\n"
+            f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n"
+            f"📦 Ապրանք՝ <b>{escape(item[0])}</b>\n"
+            f"💰 Գին՝ <b>{item[1]:,} ֏</b>\n\n"
+            "Շարունակե՞լ պատվերը։").replace(",", " ")
     await callback.message.edit_text(text, reply_markup=product_keyboard(game), parse_mode="HTML")
     await callback.answer()
 
@@ -259,19 +300,24 @@ async def pass_retry(callback: CallbackQuery):
         await callback.answer("❌ Brawl Pass-ը չի ընտրվել։", show_alert=True)
         return
     user["brawl_pass_analyzing"] = True
-    await callback.message.edit_text(brawl_pass_prompt(pass_type), reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")]]), parse_mode="HTML")
+    await callback.message.edit_text(
+        brawl_pass_prompt(pass_type),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:game:brawlstars")]]),
+        parse_mode="HTML"
+    )
     await callback.answer()
 
 
 @dp.message(F.photo)
 async def photo_router(message: Message):
     user = get_user(message.from_user.id)
+
     if user.get("brawl_pass_analyzing") and user.get("brawl_pass_type"):
         if not OPENAI_API_KEY:
             user["brawl_pass_analyzing"] = False
             await message.answer("⚠️ AI ճանաչումը դեռ միացված չէ։ Ավելացրու <code>OPENAI_API_KEY</code> Render-ի Environment Variables-ում։", parse_mode="HTML", reply_markup=main_menu_keyboard())
             return
-        status_message = await message.answer("🔎 <b>Ստուգում եմ screenshot-ը...</b> ⏳", parse_mode="HTML")
+        status_message = await message.answer("🔎 <b>Ստուգում եմ հենց ընտրված Pass-ի գինը...</b> ⏳", parse_mode="HTML")
         try:
             file = await bot.get_file(message.photo[-1].file_id)
             buffer = BytesIO()
@@ -289,17 +335,30 @@ async def photo_router(message: Message):
         product_name = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
         user["product"] = product_name
         user["price"] = price
-        label = "🟢 Զեղչը հասանելի է" if result else "🔴 Զեղչ չկա"
-        await status_message.edit_text(("✅ <b>Screenshot-ը ճանաչվեց</b>\n\n" f"📦 {product_name}\n" f"{label}\n" f"💰 Գին՝ <b>{price:,} ֏</b>\n\n" "Շարունակե՞լ պատվերը?").replace(",", " "), reply_markup=product_keyboard("brawlstars"), parse_mode="HTML")
+        label = "🟢 Գինը զեղչված է" if result else "🔴 Սովորական գին"
+        await status_message.edit_text(
+            ("✅ <b>Գինը ճանաչվեց</b>\n\n"
+             f"📦 {product_name}\n"
+             f"{label}\n"
+             f"💰 Գին՝ <b>{price:,} ֏</b>\n\n"
+             "Շարունակե՞լ պատվերը?").replace(",", " "),
+            reply_markup=product_keyboard("brawlstars"),
+            parse_mode="HTML"
+        )
         return
+
     if user.get("support_waiting") and SUPPORT_CHANNEL_ID:
         username = message.from_user.username or "չկա"
-        caption = ("📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n" f"👤 Username՝ @{escape(username)}\n" f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n" "↩️ Պատասխանեք այս հաղորդագրությանը՝ օգտատիրոջը ուղարկելու համար։")
+        caption = ("📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n"
+                   f"👤 Username՝ @{escape(username)}\n"
+                   f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n"
+                   "↩️ Պատասխանեք этому сообщению՝ օգտատիրոջը ուղարկելու համար։")
         sent = await bot.send_photo(chat_id=SUPPORT_CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption, parse_mode="HTML")
         support_threads[sent.message_id] = message.from_user.id
         user["support_waiting"] = False
         await message.answer("✅ Նկարը ստացվեց։ Մենք կպատասխանենք շուտով։", reply_markup=main_menu_keyboard())
         return
+
     if user.get("payment") != "receipt_pending":
         return
     if not ORDER_CHANNEL_ID:
@@ -318,7 +377,10 @@ async def buy_confirm(callback: CallbackQuery):
     if not user.get("game") or not user.get("product"):
         await callback.answer("❌ Նախ ընտրիր ապրանքը։", show_alert=True)
         return
-    text = ("💳 <b>Ընտրիր վճարման եղանակը</b>\n\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" "Ընտրիր՝ ինչպես ես ցանկանում վճարել։").replace(",", " ")
+    text = ("💳 <b>Ընտրեք способ оплаты</b>\n\n"
+            f"📦 {escape(user['product'])}\n"
+            f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n"
+            "Ընտրեք վճարման եղանակը։").replace(",", " ")
     await callback.message.edit_text(text, reply_markup=payment_keyboard(), parse_mode="HTML")
     await callback.answer()
 
@@ -330,14 +392,14 @@ async def payment_card(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "payment:cash")
 async def payment_cash(callback: CallbackQuery):
-    text = ("💎 <b>Games Vault Shop-ից Բարևներ</b> ❤️‍🔥\n\n"
-            "💵 <b>Վճարման քայլերը՝</b>\n\n"
-            "1️⃣ Telcell տերմինալում ընտրեք <b>«Telcell Wallet»</b> և մուտքագրեք հեռախոսահամարը՝ <code>043055510</code> 📱\n\n"
-            "2️⃣ Կատարեք վճարումը անհրաժեշտ գումարի չափով։ 💰\n\n"
-            "3️⃣ 🧾 Վճարումից հետո <b>նկարեք չեկը</b> և ուղարկեք մեզ։\n\n"
-            "4️⃣ 🆔 Այնուհետև ուղարկեք ձեր <b>ID-ն</b>։\n\n"
-            "⚡ Վճարումը ստանալուց և ստուգելուց հետո <b>1–2 րոպեում</b> կստանաք ձեր Դոնաթը։ ❤️‍🔥\n\n"
-            "🧾 <b>Ուղարկիր չեկի նկարը</b>")
+    user = get_user(callback.from_user.id)
+    text = ("💵 <b>Կանխիկ վճարում</b>\n\n"
+            f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
+            f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n"
+            f"💳 Telcell Wallet\n📱 Համար՝ <code>{escape(TELCELL_NUMBER)}</code>\n\n"
+            "Telcell տերմինալով ընտրեք «Telcell Wallet» տարբերակը և գրեք հեռախոսահամարը։\n\n"
+            "🧾 Վճարումից հետո սեղմեք «Ուղարկել չեկի նկարը»։").replace(",", " ")
+    user["payment"] = "cash"
     await callback.message.edit_text(text, reply_markup=receipt_keyboard(), parse_mode="HTML")
     await callback.answer()
 
@@ -349,7 +411,11 @@ async def payment_done(callback: CallbackQuery):
         await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
         return
     user["payment"] = "receipt_pending"
-    await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text(
+        "🧾 <b>Ուղարկիր վճարման չեկը</b>\n\nՈւղարկիր չեկի լուսանկարը այս հաղորդագրությունից հետո։",
+        reply_markup=receipt_keyboard(),
+        parse_mode="HTML"
+    )
     await callback.answer()
 
 
@@ -379,10 +445,14 @@ async def back_product(callback: CallbackQuery):
     user = get_user(callback.from_user.id)
     game = user.get("game")
     if not game or not user.get("product"):
-        await callback.message.edit_text(main_text(), reply_markup=main_menu_keyboard())
+        await callback.message.edit_text(main_text(), reply_markup=main_menu_keyboard(), parse_mode="HTML")
         await callback.answer()
         return
-    text = ("🛒 <b>Ձեր ընտրությունը</b>\n\n" f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գին՝ <b>{user['price']:,} ֏</b>\n\n" "Շարունակե՞լ պատվերը։").replace(",", " ")
+    text = ("🛒 <b>Ձեր ընտրությունը</b>\n\n"
+            f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n"
+            f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n"
+            f"💰 Գին՝ <b>{user['price']:,} ֏</b>\n\n"
+            "Շարունակե՞լ պատվերը։").replace(",", " ")
     await callback.message.edit_text(text, reply_markup=product_keyboard(game), parse_mode="HTML")
     await callback.answer()
 
