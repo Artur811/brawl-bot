@@ -81,11 +81,15 @@ def product_keyboard(game: str):
 
 
 def payment_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Վճարել եմ", callback_data="payment:done")], [InlineKeyboardButton(text="💳 Քարտ տրամադրել — հասանելի չէ", callback_data="card:unavailable")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:product")]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Վճարել քարտով", callback_data="payment:card")],
+        [InlineKeyboardButton(text="💵 Վճարել կանխիկ", callback_data="payment:cash")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:product")],
+    ])
 
 
 def receipt_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🧾 Ուղարկել չեկի նկարը", callback_data="payment:done")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]])
 
 
 def pass_result_keyboard():
@@ -263,7 +267,7 @@ async def photo_router(message: Message):
         return
     if user.get("support_waiting") and SUPPORT_CHANNEL_ID:
         username = message.from_user.username or "չկա"
-        caption = ("📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n" f"👤 Username՝ @{escape(username)}\n" f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n" "↩️ Պատասխանեք этому сообщению՝ օգտատիրոջը ուղարկելու համար։")
+        caption = ("📷 <b>ՆՈՐ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ</b>\n\n" f"👤 Username՝ @{escape(username)}\n" f"🆔 ID՝ <code>{message.from_user.id}</code>\n\n" "↩️ Պատասխանեք այս հաղորդագրությանը՝ օգտատիրոջը ուղարկելու համար։")
         sent = await bot.send_photo(chat_id=SUPPORT_CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption, parse_mode="HTML")
         support_threads[sent.message_id] = message.from_user.id
         user["support_waiting"] = False
@@ -287,14 +291,28 @@ async def buy_confirm(callback: CallbackQuery):
     if not user.get("game") or not user.get("product"):
         await callback.answer("❌ Նախ ընտրիր ապրանքը։", show_alert=True)
         return
-    text = ("💳 <b>Վճարում</b>\n\n" f"📦 {escape(user['product'])}\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" f"Telcell Wallet\n📱 Համար՝ <code>{escape(TELCELL_NUMBER)}</code>\n\n" "Telcell տերմինալով ընտրեք «Telcell Wallet» տարբերակը և գրեք հեռախոսահամարը։\n\n" "❗ Վճարումից հետո ուղարկեք չեկը.").replace(",", " ")
+    text = ("💳 <b>Ընտրիր վճարման եղանակը</b>\n\n" f"📦 Ապրանք՝ <b>{escape(user['product'])}</b>\n" f"💰 Գումար՝ <b>{user['price']:,} ֏</b>\n\n" "Ընտրիր՝ ինչպես ես ցանկանում վճարել։").replace(",", " ")
     await callback.message.edit_text(text, reply_markup=payment_keyboard(), parse_mode="HTML")
     await callback.answer()
 
 
-@dp.callback_query(F.data == "card:unavailable")
-async def card_unavailable(callback: CallbackQuery):
-    await callback.answer("💳 Քարտով վճարումը հասանելի չէ։", show_alert=True)
+@dp.callback_query(F.data == "payment:card")
+async def payment_card(callback: CallbackQuery):
+    await callback.answer("💳 Քարտով վճարումը դեռ հասանելի չէ։", show_alert=True)
+
+
+@dp.callback_query(F.data == "payment:cash")
+async def payment_cash(callback: CallbackQuery):
+    text = ("💎 <b>Games Vault Shop-ից Բարևներ</b> ❤️‍🔥\n\n"
+            "💵 <b>Վճարման քայլերը՝</b>\n\n"
+            "1️⃣ Telcell տերմինալում ընտրեք <b>«Telcell Wallet»</b> և մուտքագրեք հեռախոսահամարը՝ <code>043055510</code> 📱\n\n"
+            "2️⃣ Կատարեք վճարումը անհրաժեշտ գումարի չափով։ 💰\n\n"
+            "3️⃣ 🧾 Վճարումից հետո <b>նկարեք չեկը</b> և ուղարկեք մեզ։\n\n"
+            "4️⃣ 🆔 Այնուհետև ուղարկեք ձեր <b>ID-ն</b>։\n\n"
+            "⚡ Վճարումը ստանալուց և ստուգելուց հետո <b>1–2 րոպեում</b> կստանաք ձեր Դոնաթը։ ❤️‍🔥\n\n"
+            "🧾 <b>Ուղարկիր չեկի նկարը</b>")
+    await callback.message.edit_text(text, reply_markup=receipt_keyboard(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "payment:done")
@@ -304,8 +322,13 @@ async def payment_done(callback: CallbackQuery):
         await callback.answer("❌ Պատվերը չի գտնվել։", show_alert=True)
         return
     user["payment"] = "receipt_pending"
-    await callback.message.edit_text("🧾 <b>Ուղարկիր վճարման չեկը</b>\n\nՈւղարկիր չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
+    await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
     await callback.answer()
+
+
+@dp.callback_query(F.data == "card:unavailable")
+async def card_unavailable(callback: CallbackQuery):
+    await callback.answer("💳 Քարտով վճարումը դեռ հասանելի չէ։", show_alert=True)
 
 
 @dp.callback_query(F.data == "back:main")
