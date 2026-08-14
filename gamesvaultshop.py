@@ -13,8 +13,7 @@ from openai import AsyncOpenAI
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-CHANNEL_ID = os.getenv("CHANNEL_ID", "")
-ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", CHANNEL_ID)
+ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", "")
 SUPPORT_CHANNEL_ID = os.getenv("SUPPORT_CHANNEL_ID", "")
 TELCELL_NUMBER = os.getenv("TELCELL_NUMBER", "043055510")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -324,11 +323,6 @@ async def payment_done(callback: CallbackQuery):
     user["payment"] = "receipt_pending"
     await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\nՈւղարկիր վճարման չեկի լուսանկարը այս հաղորդագրությունից հետո։", reply_markup=receipt_keyboard(), parse_mode="HTML")
     await callback.answer()
-
-
-@dp.callback_query(F.data == "card:unavailable")
-async def card_unavailable(callback: CallbackQuery):
-    await callback.answer("💳 Քարտով վճարումը դեռ հասանելի չէ։", show_alert=True)
 
 
 @dp.callback_query(F.data == "back:main")
