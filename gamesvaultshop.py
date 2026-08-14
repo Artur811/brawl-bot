@@ -40,8 +40,34 @@ CATALOG = {
 
 def get_user(user_id: int):
     if user_id not in users:
-        users[user_id] = {"game": None, "product": None, "price": None, "username": None, "payment": None, "order_id": None, "support_waiting": False, "brawl_pass_type": None, "brawl_pass_waiting": False, "receipt_waiting_id": False, "receipt_order_message_id": None, "receipt_accepted": False, "refund_waiting": False}
+        users[user_id] = {
+            "game": None,
+            "product": None,
+            "price": None,
+            "username": None,
+            "payment": None,
+            "order_id": None,
+            "support_waiting": False,
+            "brawl_pass_type": None,
+            "brawl_pass_waiting": False,
+            "receipt_waiting_id": False,
+            "receipt_order_message_id": None,
+            "receipt_accepted": False,
+            "refund_waiting": False,
+            "refund_method": None,
+            "refund_operator": None,
+            "refund_details_ready": False,
+            "refund_complete": False,
+        }
     return users[user_id]
+
+
+def reset_refund_state(user: dict):
+    user["refund_waiting"] = False
+    user["refund_method"] = None
+    user["refund_operator"] = None
+    user["refund_details_ready"] = False
+    user["refund_complete"] = False
 
 
 def fmt_price(value: int) -> str:
@@ -87,16 +113,37 @@ def admin_pass_price_keyboard(user_id: int, pass_type: str):
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f"💰 {fmt_price(low)} ֏", callback_data=f"passprice:{user_id}:{low}"), InlineKeyboardButton(text=f"💰 {fmt_price(high)} ֏", callback_data=f"passprice:{user_id}:{high}")]])
 
 
-def admin_receipt_keyboard(user_id: int, receipt_accepted: bool = False):
-    rows = [[InlineKeyboardButton(text="❌ Մերժել չեկը", callback_data=f"receipt:reject:{user_id}"), InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{user_id}")], [InlineKeyboardButton(text="💸 Տրամադրել հետ գումարը", callback_data=f"receipt:refund:{user_id}")]]
+def admin_receipt_keyboard(user_id: int, receipt_accepted: bool = False, refund_details_ready: bool = False):
+    rows = [
+        [InlineKeyboardButton(text="❌ Մերժել չեկը", callback_data=f"receipt:reject:{user_id}"), InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{user_id}")],
+        [InlineKeyboardButton(text="💸 Տրամադրել հետ գումարը", callback_data=f"receipt:refund:{user_id}")],
+    ]
     if receipt_accepted:
         rows.append([InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"receipt:confirm:{user_id}")])
+    if refund_details_ready:
+        rows.append([InlineKeyboardButton(text="✅ Հետ գումարի վերադարձը ավարտված է", callback_data=f"receipt:refund_complete:{user_id}")])
     rows.append([InlineKeyboardButton(text="↩️ Հետ", callback_data=f"receipt:back:{user_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def refund_keyboard(user_id: int):
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Հեռախոսահամարին", callback_data=f"refund:phone:{user_id}")], [InlineKeyboardButton(text="💳 Քարտին", callback_data=f"refund:card:{user_id}")], [InlineKeyboardButton(text="↩️ Հետ", callback_data=f"refund:back:{user_id}")]])
+def refund_client_method_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Հեռախոսահամարին", callback_data="refundclient:phone")],
+        [InlineKeyboardButton(text="💳 Քարտին", callback_data="refundclient:card")],
+    ])
+
+
+def refund_operators_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📞 Viva", callback_data="refundclient:operator:Viva")],
+        [InlineKeyboardButton(text="📞 Team Telecom Armenia", callback_data="refundclient:operator:Team Telecom Armenia")],
+        [InlineKeyboardButton(text="📞 Ucom", callback_data="refundclient:operator:Ucom")],
+        [InlineKeyboardButton(text="↩️ Հետ", callback_data="refundclient:back")],
+    ])
+
+
+def refund_back_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="↩️ Հետ", callback_data="refundclient:back")]])
 
 
 def main_text():
@@ -104,7 +151,7 @@ def main_text():
 
 
 def game_text(game: str):
-    return f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով։"
+    return f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով."
 
 
 def order_caption(user_id: int, user: dict, status: str):
@@ -130,9 +177,9 @@ def cash_payment_text(user: dict):
     return ("💎 <b>Games Vault Shop-ից Բարևներ</b> ❤️‍🔥\n\n" "💵 <b>Վճարման քայլերը՝</b>\n\n" "1️⃣ Telcell տերմինալում ընտրեք <b>«Telcell Wallet»</b> և մուտքագրեք հեռախոսահամարը՝ " f"<code>{escape(TELCELL_NUMBER)}</code> 📱\n\n" f"2️⃣ Կատարեք վճարումը՝ <b>{fmt_price(price)} ֏</b> 💰\n\n" "3️⃣ 🧾 Վճարումից հետո նկարեք չեկը և ուղարկեք մեզ։\n\n" "4️⃣ 🆔 Այնուհետև տրամադրեք ձեր ID-ն։\n\n" "⚡ <b>1–2 րոպեում ստանում եք ձեր Դոնաթը։</b> ✅❤️‍🔥\n\n" f"📦 Պատվեր՝ <b>{product}</b>")
 
 
-async def notify_user(user_id: int, text: str):
+async def notify_user(user_id: int, text: str, reply_markup=None):
     try:
-        await bot.send_message(user_id, text, parse_mode="HTML")
+        await bot.send_message(user_id, text, parse_mode="HTML", reply_markup=reply_markup)
     except Exception:
         logging.exception("Failed to notify user %s", user_id)
 
@@ -143,7 +190,17 @@ async def update_admin_receipt_message(user_id: int, status: str):
     if not message_id or not ORDER_CHANNEL_ID:
         return
     try:
-        await bot.edit_message_caption(chat_id=ORDER_CHANNEL_ID, message_id=message_id, caption=order_caption(user_id, user, status), parse_mode="HTML", reply_markup=admin_receipt_keyboard(user_id, user.get("receipt_accepted", False)))
+        await bot.edit_message_caption(
+            chat_id=ORDER_CHANNEL_ID,
+            message_id=message_id,
+            caption=order_caption(user_id, user, status),
+            parse_mode="HTML",
+            reply_markup=admin_receipt_keyboard(
+                user_id,
+                user.get("receipt_accepted", False),
+                user.get("refund_details_ready", False),
+            ),
+        )
     except Exception:
         logging.exception("Failed to update admin receipt message")
 
@@ -177,6 +234,56 @@ async def contact_open(callback: CallbackQuery):
 @dp.message(F.text)
 async def text_router(message: Message):
     user = get_user(message.from_user.id)
+
+    if user.get("refund_waiting") and user.get("refund_method") == "phone" and user.get("refund_operator"):
+        phone = message.text.strip()
+        if not phone:
+            await message.answer("⚠️ Մուտքագրիր ճիշտ հեռախոսահամարը։")
+            return
+        user["refund_details_ready"] = True
+        user["refund_waiting"] = False
+        user["refund_phone"] = phone
+        await notify_user(message.from_user.id, "✅ <b>Հեռախոսահամարը ստացվեց։</b>\n\n💸 Գումարի վերադարձի տվյալները ուղարկվեցին ադմինին։\n⏳ Սպասիր վերադարձի ավարտին։", reply_markup=main_menu_keyboard())
+        await bot.send_message(
+            ORDER_CHANNEL_ID,
+            "💸 <b>ՎԵՐԱԴԱՐՁԻ ՏՎՅԱԼՆԵՐ</b>\n\n"
+            f"👤 Username՝ @{escape(user.get('username') or 'չկա')}\n"
+            f"🆔 ID՝ <code>{message.from_user.id}</code>\n"
+            f"📦 Ապրանք՝ <b>{escape(user.get('product') or 'չկա')}</b>\n"
+            f"💰 Գումար՝ <b>{fmt_price(user.get('price') or 0)} ֏</b>\n"
+            "💔 Դոնաթը չի հաջողվել։\n"
+            f"📱 Եղանակ՝ <b>Հեռախոսահամարին</b>\n"
+            f"📞 Օպերատոր՝ <b>{escape(user['refund_operator'])}</b>\n"
+            f"☎️ Հեռախոս՝ <code>{escape(phone)}</code>",
+            parse_mode="HTML",
+        )
+        await update_admin_receipt_message(message.from_user.id, "⏳ <b>Սպասում է հետ գումարի վերադարձին։</b>\n📱 Հեռախոսահամարը և օպերատորը ստացվել են։")
+        return
+
+    if user.get("refund_waiting") and user.get("refund_method") == "card":
+        card_data = message.text.strip()
+        if not card_data:
+            await message.answer("⚠️ Մուտքագրիր քարտի տվյալները։")
+            return
+        user["refund_details_ready"] = True
+        user["refund_waiting"] = False
+        user["refund_card"] = card_data
+        await notify_user(message.from_user.id, "✅ <b>Քարտի տվյալները ստացվեցին։</b>\n\n💸 Գումարի վերադարձի տվյալները ուղարկվեցին ադմինին։\n⏳ Սպասիր վերադարձի ավարտին։", reply_markup=main_menu_keyboard())
+        await bot.send_message(
+            ORDER_CHANNEL_ID,
+            "💸 <b>ՎԵՐԱԴԱՐՁԻ ՏՎՅԱԼՆԵՐ</b>\n\n"
+            f"👤 Username՝ @{escape(user.get('username') or 'չկա')}\n"
+            f"🆔 ID՝ <code>{message.from_user.id}</code>\n"
+            f"📦 Ապրանք՝ <b>{escape(user.get('product') or 'չկա')}</b>\n"
+            f"💰 Գումար՝ <b>{fmt_price(user.get('price') or 0)} ֏</b>\n"
+            "💔 Դոնաթը չի հաջողվել։\n"
+            "💳 Եղանակ՝ <b>Քարտին</b>\n"
+            f"💳 Քարտի տվյալներ՝ <code>{escape(card_data)}</code>",
+            parse_mode="HTML",
+        )
+        await update_admin_receipt_message(message.from_user.id, "⏳ <b>Սպասում է հետ գումարի վերադարձին։</b>\n💳 Քարտի տվյալները ստացվել են։")
+        return
+
     if user.get("receipt_waiting_id"):
         if not user.get("receipt_order_message_id"):
             user["receipt_waiting_id"] = False
@@ -189,6 +296,7 @@ async def text_router(message: Message):
             logging.exception("Failed to send user ID to order channel")
             await message.answer("⚠️ Չհաջողվեց ուղարկել ID-ն։ Փորձեք կրկին։")
         return
+
     if not user.get("support_waiting") or not SUPPORT_CHANNEL_ID:
         return
     username = message.from_user.username or "չկա"
@@ -209,7 +317,8 @@ async def choose_game(callback: CallbackQuery):
         await callback.answer("❌ Սխալ խաղ։", show_alert=True)
         return
     user = get_user(callback.from_user.id)
-    user.update({"game": game, "product": None, "price": None, "payment": None, "order_id": None, "brawl_pass_type": None, "brawl_pass_waiting": False, "receipt_waiting_id": False, "receipt_order_message_id": None, "receipt_accepted": False, "refund_waiting": False})
+    user.update({"game": game, "product": None, "price": None, "payment": None, "order_id": None, "brawl_pass_type": None, "brawl_pass_waiting": False, "receipt_waiting_id": False, "receipt_order_message_id": None, "receipt_accepted": False})
+    reset_refund_state(user)
     await callback.message.edit_text(game_text(game), reply_markup=game_keyboard(game), parse_mode="HTML")
     await callback.answer()
 
@@ -226,7 +335,8 @@ async def choose_product(callback: CallbackQuery):
         await callback.answer("❌ Սխալ ապրանք։", show_alert=True)
         return
     user = get_user(callback.from_user.id)
-    user.update({"game": game, "product": item[0], "price": item[1], "username": callback.from_user.username, "payment": None, "receipt_accepted": False, "refund_waiting": False})
+    user.update({"game": game, "product": item[0], "price": item[1], "username": callback.from_user.username, "payment": None, "receipt_accepted": False})
+    reset_refund_state(user)
     if game == "brawlstars" and item[0] in {"Brawl Pass", "Brawl Pass+"}:
         user["brawl_pass_type"] = "brawl_pass" if item[0] == "Brawl Pass" else "brawl_pass_plus"
         user["brawl_pass_waiting"] = True
@@ -343,84 +453,132 @@ async def admin_receipt_action(callback: CallbackQuery, action: str, user_id: in
     if not await admin_only(callback):
         return
     user = get_user(user_id)
+
     if action == "reject":
         user["payment"] = "receipt_rejected"
         user["receipt_accepted"] = False
-        user["refund_waiting"] = False
+        reset_refund_state(user)
         status = "❌ <b>Չեկը մերժված է։</b>"
         await notify_user(user_id, "❌ <b>Ձեր վճարման չեկը մերժվել է։</b>\n\nԽնդրում ենք կապվել Games Vault Shop-ի աջակցության հետ։")
         await callback.answer("❌ Չեկը մերժվեց։")
+
     elif action == "accept":
         user["receipt_accepted"] = True
         user["payment"] = "receipt_accepted"
-        user["refund_waiting"] = False
+        reset_refund_state(user)
         status = "✅ <b>Չեկը հաստատված է։ Այժմ կարող եք հաստատել պատվերը և ավարտել Դոնաթը։</b>"
         await notify_user(user_id, "✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Ձեր պատվերը պատրաստվում է։")
-        await callback.answer("✅ Չեկը հաստատվեց։ Այժմ հասանելի է հաստատել պատվերը։")
+        await callback.answer("✅ Չեկը հաստատվեց։")
+
     elif action == "refund":
         user["refund_waiting"] = True
-        try:
-            await callback.message.edit_reply_markup(reply_markup=refund_keyboard(user_id))
-        except Exception:
-            logging.exception("Failed to show refund options")
-        await callback.answer("💸 Ընտրեք եղանակը վերադարձի համար։")
-        return
+        user["refund_method"] = None
+        user["refund_operator"] = None
+        user["refund_details_ready"] = False
+        user["refund_complete"] = False
+        user["payment"] = "refund_requested"
+        status = "💔 <b>Դոնաթը չի հաջողվել։</b>\n⏳ Սպասում է հաճախորդի վերադարձի եղանակին։"
+        await notify_user(
+            user_id,
+            "💔 <b>Դոնաթը չի հաջողվել։</b>\n\n"
+            "💸 Ընտրիր գումարի վերադարձի եղանակը՝",
+            reply_markup=refund_client_method_keyboard(),
+        )
+        await callback.answer("💸 Հաճախորդին ուղարկվեց վերադարձի եղանակի ընտրությունը։")
+
     elif action == "confirm":
         if not user.get("receipt_accepted"):
             await callback.answer("⛔ Նախ անհրաժեշտ է հաստատել չեկը։", show_alert=True)
             return
         user["payment"] = "completed"
-        user["refund_waiting"] = False
+        reset_refund_state(user)
         status = "📦 <b>Պատվերը հաստատված է — Դոնաթը ավարտված է։</b>"
         await notify_user(user_id, "🎉 <b>Ձեր պատվերը հաստատված է։</b> ❤️‍🔥\n\n⚡ <b>Դոնաթը հաջողությամբ ավարտված է։</b>\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎")
         await callback.answer("📦 Պատվերը հաստատվեց։ Դոնաթը ավարտված է։")
-    elif action == "back":
+
+    elif action == "refund_complete":
+        if not user.get("refund_details_ready"):
+            await callback.answer("⛔ Նախ սպասեք հաճախորդի վերադարձի տվյալներին։", show_alert=True)
+            return
+        user["refund_complete"] = True
         user["refund_waiting"] = False
-        await update_admin_receipt_message(user_id, "✅ <b>Չեկը հաստատված է։</b>" if user.get("receipt_accepted") else "⏳ <b>Չեկը սպասում է ադմինի ստուգմանը։</b>")
+        user["payment"] = "refunded_completed"
+        status = "✅ <b>Հետ գումարի վերադարձը ավարտված է։</b>"
+        await notify_user(user_id, "✅ <b>Հետ գումարի վերադարձը ավարտված է։</b>\n\n💸 Գումարը վերադարձվել է ընտրված եղանակով։\n\n💎 Games Vault Shop ❤️‍🔥")
+        await callback.answer("✅ Հետ գումարի վերադարձը ավարտված է։")
+
+    elif action == "back":
+        status = "✅ <b>Չեկը հաստատված է։</b>" if user.get("receipt_accepted") else "⏳ <b>Չեկը սպասում է ադմինի ստուգմանը։</b>"
+        await update_admin_receipt_message(user_id, status)
         await callback.answer("↩️ Վերադարձ։")
         return
+
     else:
         await callback.answer("❌ Անհայտ գործողություն։", show_alert=True)
         return
+
     await update_admin_receipt_message(user_id, status)
 
 
-@dp.callback_query(F.data.startswith("refund:"))
-async def refund_callback(callback: CallbackQuery):
-    if not await admin_only(callback):
+@dp.callback_query(F.data.startswith("refundclient:"))
+async def refund_client_callback(callback: CallbackQuery):
+    user = get_user(callback.from_user.id)
+    if not user.get("refund_waiting"):
+        await callback.answer("❌ Վերադարձի գործընթացը չի սկսվել։", show_alert=True)
         return
+
     parts = callback.data.split(":")
-    if len(parts) != 3:
-        await callback.answer("❌ Սխալ գործողություն։", show_alert=True)
+    action = parts[1] if len(parts) > 1 else ""
+
+    if action == "back":
+        user["refund_method"] = None
+        user["refund_operator"] = None
+        await callback.message.edit_text(
+            "💔 <b>Դոնաթը չի հաջողվել։</b>\n\n💸 Ընտրիր գումարի վերադարձի եղանակը՝",
+            reply_markup=refund_client_method_keyboard(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
         return
-    _, method, user_id_text = parts
-    try:
-        user_id = int(user_id_text)
-    except ValueError:
-        await callback.answer("❌ Սխալ օգտատիրոջ ID։", show_alert=True)
+
+    if action == "phone":
+        user["refund_method"] = "phone"
+        await callback.message.edit_text(
+            "📱 <b>Վերադարձ հեռախոսահամարին</b>\n\n"
+            "⚠️ Գումարը կավելանա բջջային հաշվեկշռին և կարող է օգտագործվել զանգերի համար։\n\n"
+            "Ընտրիր քո օպերատորը՝",
+            reply_markup=refund_operators_keyboard(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
         return
-    user = get_user(user_id)
-    if method == "back":
-        user["refund_waiting"] = False
-        await update_admin_receipt_message(user_id, "✅ <b>Չեկը հաստատված է։</b>" if user.get("receipt_accepted") else "⏳ <b>Չեկը սպասում է ադմինի ստուգմանը։</b>")
-        await callback.answer("↩️ Վերադարձ։")
+
+    if action == "card":
+        user["refund_method"] = "card"
+        await callback.message.edit_text(
+            "💳 <b>Վերադարձ քարտին</b>\n\n"
+            "Գրիր քարտի տվյալները հաջորդ հաղորդագրությամբ։",
+            reply_markup=refund_back_keyboard(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
         return
-    if method == "phone":
-        user["payment"] = "refunded_phone"
-        user["refund_waiting"] = False
-        status = "📱 <b>Հետ գումարը տրամադրվում է հեռախոսահամարին։</b>"
-        await notify_user(user_id, "💸 <b>Ձեր գումարի վերադարձը հաստատվել է։</b>\n\n📱 Վերադարձը կատարվում է հեռախոսահամարին։\n⚠️ Խնդրում ենք նկատի ունենալ, որ գումարը կարող է մուտքագրվել բջջային հաշվեկշռին և օգտագործվել զանգերի համար։")
-        await callback.answer("📱 Վերադարձը նշվեց՝ հեռախոսահամարին։")
-    elif method == "card":
-        user["payment"] = "refunded_card"
-        user["refund_waiting"] = False
-        status = "💳 <b>Հետ գումարը տրամադրվում է քարտին։</b>"
-        await notify_user(user_id, "💸 <b>Ձեր գումարի վերադարձը հաստատվել է։</b>\n\n💳 Վերադարձը կատարվում է քարտին։")
-        await callback.answer("💳 Վերադարձը նշվեց՝ քարտին։")
-    else:
-        await callback.answer("❌ Անհայտ տարբերակ։", show_alert=True)
+
+    if action == "operator" and len(parts) >= 3:
+        operator = ":".join(parts[2:])
+        user["refund_method"] = "phone"
+        user["refund_operator"] = operator
+        user["refund_waiting"] = True
+        await callback.message.edit_text(
+            f"📞 <b>{escape(operator)}</b>\n\n"
+            "☎️ Գրիր քո հեռախոսահամարը հաջորդ հաղորդագրությամբ։",
+            reply_markup=refund_back_keyboard(),
+            parse_mode="HTML",
+        )
+        await callback.answer()
         return
-    await update_admin_receipt_message(user_id, status)
+
+    await callback.answer("❌ Անհայտ գործողություն։", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("receipt:"))
@@ -443,6 +601,7 @@ async def back_main(callback: CallbackQuery):
     user = get_user(callback.from_user.id)
     user["support_waiting"] = False
     user["brawl_pass_waiting"] = False
+    user["refund_waiting"] = False
     await callback.message.edit_text(main_text(), reply_markup=main_menu_keyboard(), parse_mode="HTML")
     await callback.answer()
 
@@ -455,6 +614,7 @@ async def back_game(callback: CallbackQuery):
         return
     user = get_user(callback.from_user.id)
     user["brawl_pass_waiting"] = False
+    user["refund_waiting"] = False
     await callback.message.edit_text(game_text(game), reply_markup=game_keyboard(game), parse_mode="HTML")
     await callback.answer()
 
