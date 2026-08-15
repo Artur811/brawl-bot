@@ -1,0 +1,34 @@
+name: Update 2FA ready flow
+on:
+  push:
+    paths:
+      - .github/workflows/update-2fa.yml
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update 2FA flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("        [InlineKeyboardButton(text='📱 Այլ սարքով հաստատում', callback_data=f'verify:{uid}:device')],\n", "")
+          s = s.replace("        if user.get('verification_type') and not user.get('verification_done'):\n            await callback.answer('⚠️ Սպասիր, մինչև հաճախորդը հաստատի մուտքը 2FA-ով։', show_alert=True)\n            return\n", "        if not user.get('verification_type') or not user.get('verification_done'):\n            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator և սպասիր «Պատրաստ է» հաստատմանը։', show_alert=True)\n            return\n")
+          old = "    await notify(ADMIN_ID, order_summary(callback.from_user.id, user, '🟢 Հաճախորդը հաստատեց 2FA մուտքը։ Կարող եք շարունակել պատվերը.'), admin_kb(callback.from_user.id))\n"
+          new = "    await notify(ADMIN_ID, '🟢 <b>ՊԱՏՐԱՍՏ Է</b>\\n\\n'\n                     f'👤 @{escape(user.get(\"username\") or \"չկա\")}\\n'\n                     f'🆔 Telegram ID՝ <code>{callback.from_user.id}</code>\\n'\n                     f'📦 Ապրանք՝ <b>{escape(user.get(\"product\") or \"չկա\")}</b>\\n'\n                     f'💰 Գին՝ <b>{fmt(user.get(\"price\") or 0)} ֏</b>\\n'\n                     '🔐 2FA՝ հաստատված է։', admin_kb(callback.from_user.id))\n"
+          if old not in s:
+              raise SystemExit('Expected verify_done block not found')
+          s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gamesvaultshop.py
+          git commit -m 'Fix Armenian 2FA ready flow' || exit 0
+          git push
