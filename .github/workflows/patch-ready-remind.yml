@@ -1,0 +1,42 @@
+name: Patch admin verification resend
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch gamesvaultshop.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+          old = """        if user.get('verification_done'):\n            rows.append([InlineKeyboardButton(text='🟢 Պատրաստ է', callback_data=f'receipt:ready:{uid}')])\n            rows.append([InlineKeyboardButton(text='❌ Դոնաթը չի հաջողվել', callback_data=f'receipt:failed:{uid}')])\n        rows.append([InlineKeyboardButton(text='📦 Հաստատել պատվերը', callback_data=f'receipt:confirm:{uid}')])\n"""
+          new = """        if user.get('verification_done'):\n            rows.append([InlineKeyboardButton(text='🟢 Պատրաստ է', callback_data=f'receipt:ready:{uid}')])\n            rows.append([InlineKeyboardButton(text='❌ Դոնաթը չի հաջողվել', callback_data=f'receipt:failed:{uid}')])\n        if user.get('verification_type'):\n            rows.append([InlineKeyboardButton(text='🔁 Կրկին ուղարկել', callback_data=f'receipt:resend:{uid}')])\n        rows.append([InlineKeyboardButton(text='📦 Հաստատել պատվերը', callback_data=f'receipt:confirm:{uid}')])\n"""
+          if old not in s:
+              raise SystemExit('admin_kb target block not found')
+          s = s.replace(old, new, 1)
+          marker = """    if action == 'ready':\n"""
+          handler = """    if action == 'resend':\n        if not user.get('verification_type'):\n            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator։', show_alert=True)\n            return\n        user['verification_done'] = False\n        await save_state()\n        await send_verification(uid, user['verification_type'])\n        await callback.answer('🔁 Հրահանգը կրկին ուղարկվեց հաճախորդին։')\n        return\n"""
+          if marker not in s:
+              raise SystemExit('receipt action marker not found')
+          s = s.replace(marker, handler + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gamesvaultshop.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Add admin resend verification button"
+          git push
+      - name: Remove temporary workflow
+        run: |
+          git rm .github/workflows/patch-ready-remind.yml
+          git commit -m "Remove temporary patch workflow"
+          git push
