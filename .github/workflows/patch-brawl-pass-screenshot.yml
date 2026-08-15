@@ -3,10 +3,11 @@ name: Patch Brawl Pass screenshot flow
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/patch-brawl-pass-screenshot.yml'
 
 jobs:
   patch:
-    if: "!contains(github.event.head_commit.message, '[skip-brawl-pass]')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,12 +20,15 @@ jobs:
           p = Path('gamesvaultshop.py')
           s = p.read_text(encoding='utf-8')
 
+          if "pass_bad:" in s:
+              print('PATCH_ALREADY_PRESENT')
+              raise SystemExit(0)
+
           s = s.replace(
               'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup',
               'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto',
               1,
           )
-
           s = s.replace(
               "'brawl_pass_waiting': False, 'receipt_waiting_id': False,",
               "'brawl_pass_waiting': False, 'pass_admin_message_id': None, 'receipt_waiting_id': False,",
@@ -53,7 +57,6 @@ jobs:
              InlineKeyboardButton(text=f'💰 {fmt(high)} ֏', callback_data=f'passprice:{message.from_user.id}:{high}')],
             [InlineKeyboardButton(text='❌ Սխալ կամ վատ տեսանելի screenshot', callback_data=f'pass_bad:{message.from_user.id}')],
         ])
-
         old_message_id = user.get('pass_admin_message_id')
         if old_message_id:
             try:
@@ -69,7 +72,6 @@ jobs:
                 return
             except Exception:
                 logging.exception('Could not replace Brawl Pass screenshot; sending a new one')
-
         sent = await bot.send_photo(
             ORDER_CHANNEL_ID, message.photo[-1].file_id,
             caption=caption,
@@ -104,7 +106,6 @@ async def pass_bad(callback: CallbackQuery):
 """
           assert marker in s, 'photo router marker not found'
           s = s.replace(marker, handler + marker, 1)
-
           p.write_text(s, encoding='utf-8')
           print('PATCH_OK')
           PY
