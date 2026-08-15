@@ -117,6 +117,11 @@ def order_summary(uid,user,status):
     game_id=f"\n🎮 Game ID՝ <code>{escape(str(user.get('game_id')))}</code>" if user.get("game_id") else ""
     return f"🧾 <b>ՊԱՏՎԵՐԻ ԱՄՓՈՓՈՒՄ</b>\n\n👤 Username՝ @{escape(user.get('username') or 'չկա')}\n🆔 Telegram ID՝ <code>{uid}</code>{game_id}\n🎮 Խաղ՝ <b>{escape(game)}</b>\n📦 Ապրանք՝ <b>{escape(user.get('product') or 'չկա')}</b>\n💰 Գին՝ <b>{fmt(user.get('price') or 0)} ֏</b>\n🔖 Պատվեր՝ <code>{escape(user.get('order_id') or str(uid))}</code>\n\n📌 <b>Կարգավիճակ՝ {status}</b>"
 
+def final_status(uid,user,status):
+    game=CATALOG.get(user.get("game"),{}).get("name","չկա")
+    game_id=f"\n🎮 Game ID՝ <code>{escape(str(user.get('game_id')))}</code>" if user.get("game_id") else ""
+    return f"🧾 <b>ՊԱՏՎԵՐԻ ԿԱՐԳԱՎԻՃԱԿ</b>\n\n👤 Գնորդ՝ @{escape(user.get('username') or 'չկա')}\n🎮 Խաղ՝ <b>{escape(game)}</b>{game_id}\n📦 Ապրանք՝ <b>{escape(user.get('product') or 'չկա')}</b>\n💰 Գին՝ <b>{fmt(user.get('price') or 0)} ֏</b>\n\n📌 <b>Կարգավիճակ՝ {status}</b>"
+
 def cash_text(u):
     return f"💎 <b>Games Vault Shop-ից Բարևներ</b> ❤️‍🔥\n\n💵 <b>Վճարման քայլերը՝</b>\n\n1️⃣ Telcell տերմինալում ընտրեք <b>«Telcell Wallet»</b> և մուտքագրեք հեռախոսահամարը՝ <code>{escape(TELCELL_NUMBER)}</code> 📱\n\n2️⃣ Կատարեք վճարումը՝ <b>{fmt(u['price'])} ֏</b> 💰\n\n3️⃣ 🧾 Վճարումից հետո նկարեք չեկը և ուղարկեք մեզ։\n\n4️⃣ 🆔 Այնուհետև տրամադրեք ձեր ID-ն։\n\n⚡ <b>1–2 րոպեում ստանում եք ձեր Դոնաթը։</b> ✅❤️‍🔥\n\n📦 Պատվեր՝ <b>{escape(u['product'])}</b>"
 
@@ -131,8 +136,8 @@ async def finalize(uid,status,client_text):
         try: await bot.delete_message(ORDER_CHANNEL_ID,mid)
         except Exception: logging.exception("delete order message failed")
     if ORDER_CHANNEL_ID:
-        try: await bot.send_message(ORDER_CHANNEL_ID,order_summary(uid,u,status),parse_mode="HTML")
-        except Exception: logging.exception("final summary failed")
+        try: await bot.send_message(ORDER_CHANNEL_ID,final_status(uid,u,status),parse_mode="HTML")
+        except Exception: logging.exception("final status message failed")
     await notify(uid,client_text,main_kb())
     users[uid]=blank_user()
     await save_state()
@@ -241,7 +246,7 @@ async def receipt(c):
         await finalize(uid,"❌ Չեկը մերժված է — Դոնաթը չի հաջողվել.","❌ <b>Դոնաթը չի հաջողվել.</b>\n\nՎճարման չեկը մերժվել է։ Եթե կարծում ես, որ սխալ է, կապվիր աջակցությանը։"); await c.answer("❌ Չեկը մերժվեց։"); return
     if action=="accept":
         u["receipt_accepted"]=True; u["payment"]="receipt_accepted"; u["receipt_order_message_id"]=c.message.message_id; await save_state()
-        await c.message.edit_caption(caption=order_summary(uid,u,"✅ Չեկը հաստատված է։ Սպասում է Դոնաթի ավարտին։"),parse_mode="HTML",reply_markup=admin_kb(uid,True,u.get("refund_details_ready",False))); await notify(uid,"✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է։"); await c.answer("✅ Չեկը հաստատվեց։"); return
+        await c.message.edit_caption(caption=order_summary(uid,u,"✅ Չեկը հաստատված է։ Սպասում է Դոնաթի ավարտին."),parse_mode="HTML",reply_markup=admin_kb(uid,True,u.get("refund_details_ready",False))); await notify(uid,"✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է։"); await c.answer("✅ Չեկը հաստատվեց։"); return
     if action=="confirm":
         if not u.get("receipt_accepted"): await c.answer("⚠️ Նախ հաստատիր չեկը։",show_alert=True); return
         await finalize(uid,"📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.","🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎"); await c.answer("📦 Պատվերը ավարտվեց։"); return
