@@ -31,7 +31,8 @@ CATALOG = {
     "roblox": {"name":"🎮 Roblox", "items":[("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
     "standoff2": {"name":"🔫 Standoff 2", "items":[("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
     "brawlstars": {"name":"⭐ Brawl Stars", "items":[("30 Gems",750),("80 Gems",1500),("170 Gems",2800),("360 Gems",5100),("950 Gems",12800),("Brawl Pass",2500),("Brawl Pass+",3400),("Прокачка Brawl Pass → Brawl Pass+",1800),("Pro Pass",12300)]},
-    "pubg": {"name":"🪂 PUBG Mobile", "items":[("33 UC + 🎁",300),("66 UC + 🎁",500),("99 UC + 🎁",700),("132 UC + 🎁",1000),("150 UC + 🎁",1100),("198 UC + 🎁",1400),("210 UC + 🎁",1600),("325 UC + 🎁",2000),("355 + 5 UC + 🎁",2100),("445 UC + 🎁",2900),("505 UC + 🎁",3400),("660 UC + 🎁",4000),("720 UC + 🎁",4300),("985 UC + 🎁",6000),("1,135 UC + 🎁",7000),("1,320 UC + 🎁",7800),("1,860 UC + 🎁",10000),("2,185 UC + 🎁",11500)]}
+    "pubg": {"name":"🪂 PUBG Mobile", "items":[("33 UC + 🎁",300),("66 UC + 🎁",500),("99 UC + 🎁",700),("132 UC + 🎁",1000),("150 UC + 🎁",1100),("198 UC + 🎁",1400),("210 UC + 🎁",1600),("325 UC + 🎁",2000),("355 + 5 UC + 🎁",2100),("445 UC + 🎁",2900),("505 UC + 🎁",3400),("660 UC + 🎁",4000),("720 UC + 🎁",4300),("985 UC + 🎁",6000),("1,135 UC + 🎁",7000),("1,320 UC + 🎁",7800),("1,860 UC + 🎁",10000),("2,185 UC + 🎁",11500)]},
+    "fcmobile": {"name":"⚽ FC Mobile", "items":[("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]}
 }
 
 
@@ -78,7 +79,7 @@ def get_user(uid):
 def fmt(v): return f"{v:,}".replace(","," ")
 
 def main_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎮 Roblox",callback_data="game:roblox"),InlineKeyboardButton(text="🔫 Standoff 2",callback_data="game:standoff2")],[InlineKeyboardButton(text="⭐ Brawl Stars",callback_data="game:brawlstars"),InlineKeyboardButton(text="🪂 PUBG Mobile",callback_data="game:pubg")],[InlineKeyboardButton(text="📩 Կապվեք մեզ հետ",callback_data="contact:open")]])
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎮 Roblox",callback_data="game:roblox"),InlineKeyboardButton(text="🔫 Standoff 2",callback_data="game:standoff2")],[InlineKeyboardButton(text="⭐ Brawl Stars",callback_data="game:brawlstars"),InlineKeyboardButton(text="🪂 PUBG Mobile",callback_data="game:pubg")],[InlineKeyboardButton(text="⚽ FC Mobile",callback_data="game:fcmobile")],[InlineKeyboardButton(text="📩 Կապվեք մեզ հետ",callback_data="contact:open")]])
 
 def game_kb(game):
     rows=[]
@@ -144,7 +145,7 @@ async def finalize(uid,status,client_text):
 
 @dp.message(CommandStart())
 async def start(m):
-    u=get_user(m.from_user.id); u["username"]=m.from_user.username; u["support_waiting"]=False
+    u=get_user(m.from_user.id); u["username"]=m.from_user.username
     await save_state()
     await m.answer(main_text(),reply_markup=main_kb(),parse_mode="HTML")
 
@@ -153,13 +154,13 @@ async def menu(m): await m.answer(main_text(),reply_markup=main_kb(),parse_mode=
 
 @dp.callback_query(F.data.startswith("game:"))
 async def game(c):
-    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None,"support_waiting":False})
+    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None})
     await save_state()
     await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data.startswith("product:"))
 async def product(c):
-    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username,"support_waiting":False})
+    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username})
     if g=="brawlstars" and name in {"Brawl Pass","Brawl Pass+"}:
         u["brawl_pass_type"]="brawl_pass" if name=="Brawl Pass" else "brawl_pass_plus"; u["brawl_pass_waiting"]=True
         await save_state()
@@ -206,7 +207,6 @@ async def text(m):
             await m.answer("⚠️ Չհաջողվեց ուղարկել հաղորդագրությունը։ Փորձիր կրկին։",reply_markup=main_kb())
         return
 
-    # Refund details have priority.
     if u.get("refund_waiting") and u.get("refund_method") in {"phone","card"} and u.get("refund_details_ready") is False and (u.get("refund_operator") or u.get("refund_method")=="card"):
         u["refund_details_ready"]=True; u["refund_details"]=m.text.strip(); await save_state()
         method="📱 Հեռախոսահամար" if u["refund_method"]=="phone" else "💳 Քարտ"
@@ -297,7 +297,8 @@ async def rback(c):
 @dp.callback_query(F.data=="contact:open")
 async def contact(c):
     u=get_user(c.from_user.id); u["support_waiting"]=True; await save_state()
-    await c.message.answer("📩 <b>Գրիր քո հաղորդագրությունը</b>։\n\nՈւղարկիր այն հաջորդ հաղորդագրությամբ, և մենք կստանանք այն։",parse_mode="HTML",reply_markup=back_kb("back:main")); await c.answer()
+    await c.message.edit_text("📩 <b>Կապվեք մեզ հետ</b>\n\nԳրիր քո հաղորդագրությունը, և մենք կստանանք այն։",reply_markup=back_kb("back:main"),parse_mode="HTML")
+    await c.answer()
 
 @dp.callback_query(F.data=="back:main")
 async def bmain(c):
@@ -305,11 +306,11 @@ async def bmain(c):
 
 @dp.callback_query(F.data.startswith("back:game:"))
 async def bgame(c):
-    g=c.data.split(":",2)[2]; u=get_user(c.from_user.id); u["brawl_pass_waiting"]=False; u["support_waiting"]=False; await save_state(); await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
+    g=c.data.split(":",2)[2]; u=get_user(c.from_user.id); u["brawl_pass_waiting"]=False; await save_state(); await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data=="back:product")
 async def bprod(c):
-    u=get_user(c.from_user.id); u["support_waiting"]=False; await c.message.edit_text(f"🛒 <b>Ձեր ընտրությունը</b>\n\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏",reply_markup=product_kb(u['game']),parse_mode="HTML"); await c.answer()
+    u=get_user(c.from_user.id); await c.message.edit_text(f"🛒 <b>Ձեր ընտրությունը</b>\n\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏",reply_markup=product_kb(u['game']),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data=="back:payment")
 async def bpay(c): await buy(c)
