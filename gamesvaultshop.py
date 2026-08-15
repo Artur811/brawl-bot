@@ -111,7 +111,7 @@ def operators_kb(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboard
 
 def back_kb(cb): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Հետ",callback_data=cb)]])
 
-def main_text(): return "💎 <b>Games Vault Shop</b> ❤️‍🔥\n\n💎 <b>Games Vault Shop-ում՝ միշտ VAULT-Ա!</b>\n\n🎮 Ընտրիր խաղը և տես հասանելի ապրանքները։\n\n⚡ Արագ պատվեր\n💳 Telcell Wallet\n🧾 Չեկի ստուգում\n📩 Աջակցություն և կապ\n\n❗ Գնումից առաջ ստուգիր ապրանքի տեսակը և գինը։"
+def main_text(): return "💎 <b>Games Vault Shop</b> ❤️‍🔥\n\n💎 <b>Games Vault Shop-ում՝ միշտ VAULT-Ա!</b>\n\n🎮 Ընտրիր խաղը և տես հասանելի ապրանքները։\n\n⚡ Արագ պատվեր\n💳 Telcell Wallet\n🧾 Չեկի ստուգում\n📩 Աջակցություն և կապ։"
 
 def order_summary(uid,user,status):
     game=CATALOG.get(user.get("game"),{}).get("name","չկա")
@@ -156,7 +156,7 @@ async def menu(m): await m.answer(main_text(),reply_markup=main_kb(),parse_mode=
 async def game(c):
     g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None,"support_waiting":False})
     await save_state()
-    await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
+    await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը💰։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data.startswith("product:"))
 async def product(c):
@@ -180,7 +180,7 @@ async def photo(m):
     sent=await bot.send_photo(ORDER_CHANNEL_ID,m.photo[-1].file_id,caption=order_summary(m.from_user.id,u,"⏳ Չեկը սպասում է ադմինի ստուգմանը։"),parse_mode="HTML",reply_markup=admin_kb(m.from_user.id))
     u["receipt_order_message_id"]=sent.message_id
     await save_state()
-    await m.answer("💎 <b>Չեկը ստացվեց։</b> ❤️‍🔥\n\n🆔 Հիմա ուղարկիր քո ID-ն։",parse_mode="HTML")
+    await m.answer("💎 <b>Չեկը ստացվեց։</b> ❤️‍🔥\n\n🆔 Հիմա ուղարկիր քո Login / Գաղտնաբառ-ը։",parse_mode="HTML")
 
 @dp.message(F.text)
 async def text(m):
@@ -217,7 +217,7 @@ async def text(m):
     if u.get("receipt_waiting_id") or (u.get("payment") in {"receipt_sent","receipt_accepted"} and u.get("receipt_order_message_id")):
         game_id=m.text.strip()
         if not game_id:
-            await m.answer("⚠️ ID-ն դատարկ է։ Ուղարկիր ճիշտ ID-ն։")
+            await m.answer("⚠️ Login / Գաղտնաբառ-ը սխալ է / դատարկ է։ Ուղարկիր ճիշտ  Login / Գաղտնաբառ-ը ։")
             return
         u["game_id"]=game_id; u["receipt_waiting_id"]=False
         await save_state()
