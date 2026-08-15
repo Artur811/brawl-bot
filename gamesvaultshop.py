@@ -172,6 +172,7 @@ def admin_kb(uid):
     ]
     if user['receipt_accepted']:
         rows.append([InlineKeyboardButton(text='🔐 2FA', callback_data=f'verify_menu:{uid}')])
+        rows.append([InlineKeyboardButton(text='🔁 Կրկին խնդրել «Պատրաստ է»', callback_data=f'receipt:ask_ready:{uid}')])
         if user.get('verification_done'):
             rows.append([InlineKeyboardButton(text='🟢 Պատրաստ է', callback_data=f'receipt:ready:{uid}')])
             rows.append([InlineKeyboardButton(text='❌ Դոնաթը չի հաջողվել', callback_data=f'receipt:failed:{uid}')])
@@ -534,6 +535,33 @@ async def receipt_action(callback: CallbackQuery):
     _, action, uid_text = callback.data.split(':')
     uid = int(uid_text)
     user = get_user(uid)
+    if action == 'wrong_id':
+        user['receipt_waiting_id'] = True
+        await save_state()
+        await notify(uid,
+            '⚠️ <b>Մուտքագրված Game ID / Username-ը սխալ է։</b>\n\n'
+            '🆔 Խնդրում ենք կրկին ուղարկել ճիշտ Game ID / Username-ը։')
+        try:
+            await callback.message.edit_caption(
+                order_summary(uid, user, '⚠️ Սպասում ենք նոր Game ID / Username-ի։'),
+                parse_mode='HTML', reply_markup=admin_kb(uid))
+        except Exception:
+            logging.exception('Could not update order after wrong ID')
+        await callback.answer('📩 Հաճախորդին ուղարկվեց նոր ID ուղարկելու հարցումը։')
+        return
+    if action == 'ask_ready':
+        user['verification_done'] = False
+        await save_state()
+        await notify(uid,
+            '🔁 <b>Խնդրում ենք կրկին գրել «Պատրաստ է»</b>, երբ պատրաստ լինեք։')
+        try:
+            await callback.message.edit_caption(
+                order_summary(uid, user, '⏳ Սպասում ենք հաճախորդի «Պատրաստ է» հաղորդագրությանը։'),
+                parse_mode='HTML', reply_markup=admin_kb(uid))
+        except Exception:
+            logging.exception('Could not update order after asking ready')
+        await callback.answer('🔁 Հաճախորդին կրկին խնդրվեց գրել «Պատրաստ է»։')
+        return
     if action == 'reject':
         await finalize(uid, '❌ Չեկը մերժված է — Դոնաթը չի հաջողվել.', '❌ <b>Դոնաթը չի հաջողվել.</b>\n\nՎճարման չեկը մերժվել է։')
         await callback.answer('❌ Չեկը մերժվեց։')
@@ -722,30 +750,6 @@ async def back_product(callback: CallbackQuery):
 @dp.callback_query(F.data == 'back:payment')
 async def back_payment(callback: CallbackQuery):
     await buy_confirm(callback)
-
-
-@dp.callback_query(F.data.startswith('receipt:wrong_id:'))
-async def receipt_wrong_id(callback: CallbackQuery):
-    parts = callback.data.split(':')
-    if len(parts) != 3:
-        await callback.answer('❌ Սխալ գործողություն։', show_alert=True)
-        return
-    try:
-        uid = int(parts[2])
-    except ValueError:
-        await callback.answer('❌ Սխալ օգտատիրոջ ID։', show_alert=True)
-        return
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer('⛔ Այս կոճակը հասանելի է միայն ադմինին։', show_alert=True)
-        return
-    user = get_user(uid)
-    user['receipt_waiting_id'] = True
-    await save_state()
-    await notify(uid,
-        '⚠️ <b>Մուտքագրված ID-ն սխալ է։</b>\n\n'
-        '🆔 Խնդրում ենք կրկին ուղարկել ճիշտ Game ID / Username-ը։')
-    await callback.answer('📩 Հաճախորդին ուղարկվեց նոր ID ուղարկելու հարցումը։')
-
 
 
 async def health(request):
