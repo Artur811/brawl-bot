@@ -171,6 +171,9 @@ def admin_kb(uid):
     ]
     if user['receipt_accepted']:
         rows.append([InlineKeyboardButton(text='🔐 2FA', callback_data=f'verify_menu:{uid}')])
+        if user.get('verification_done'):
+            rows.append([InlineKeyboardButton(text='🟢 Պատրաստ է', callback_data=f'receipt:ready:{uid}')])
+            rows.append([InlineKeyboardButton(text='❌ Դոնաթը չի հաջողվել', callback_data=f'receipt:failed:{uid}')])
         rows.append([InlineKeyboardButton(text='📦 Հաստատել պատվերը', callback_data=f'receipt:confirm:{uid}')])
     if user['refund_details_ready']:
         rows.append([InlineKeyboardButton(text='✅ Հետ գումարի վերադարձը ավարտված է', callback_data=f'receipt:refund_complete:{uid}')])
@@ -186,10 +189,7 @@ def admin_verify_kb(uid):
 
 
 def client_verify_kb():
-    return kb([
-        [InlineKeyboardButton(text='✅ Մուտքը հաստատեցի', callback_data='verify_done')],
-        [InlineKeyboardButton(text='⬅️ Հետ', callback_data='back:main')],
-    ])
+    return None
 
 
 def refund_method_kb():
@@ -297,10 +297,10 @@ async def send_verification(uid, kind):
     await save_state()
     text = verification_text(kind)
     try:
-        await bot.send_photo(uid, VERIFY_IMAGES[kind], caption=text, parse_mode='HTML', reply_markup=client_verify_kb())
+        await bot.send_photo(uid, VERIFY_IMAGES[kind], caption=text, parse_mode='HTML', reply_markup=None)
     except Exception:
         logging.exception('verification image failed')
-        await notify(uid, text, client_verify_kb())
+        await notify(uid, text)
 
 
 @dp.message(CommandStart())
@@ -404,6 +404,21 @@ async def photo_router(message: Message):
 @dp.message(F.text)
 async def text_router(message: Message):
     user = get_user(message.from_user.id)
+    text_normalized = ' '.join(message.text.strip().lower().split())
+    if user.get('verification_type') and not user.get('verification_done') and text_normalized in {'պատրաստ է', 'պատրաստ', 'готово'}:
+        user['verification_done'] = True
+        await save_state()
+        await notify(ADMIN_ID,
+            '🟢 <b>ՊԱՏՐԱՍՏ Է</b>\n\n'
+            f'👤 @{escape(user.get("username") or "չկա")}\n'
+            f'🆔 Telegram ID՝ <code>{message.from_user.id}</code>\n'
+            f'📦 Ապրանք՝ <b>{escape(user.get("product") or "չկա")}</b>\n'
+            f'💰 Գին՝ <b>{fmt(user.get("price") or 0)} ֏</b>\n'
+            '🔐 2FA՝ հաճախորդը գրել է «Պատրաստ է»։',
+            admin_kb(message.from_user.id))
+        await message.answer('✅ <b>Պատրաստ է</b> հաղորդագրությունը ստացվեց։')
+        return
+
     if user.get('support_waiting'):
         if not SUPPORT_CHANNEL_ID:
             user['support_waiting'] = False
@@ -528,12 +543,22 @@ async def receipt_action(callback: CallbackQuery):
         await notify(uid, '✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է։')
         await callback.answer('✅ Չեկը հաստատվեց։')
         return
+    if action == 'ready':
+        if not user.get('verification_done'):
+            await callback.answer('⚠️ Հաճախորդը դեռ չի գրել «Պատրաստ է»։', show_alert=True)
+            return
+        await callback.answer('🟢 Պատրաստ է։ Կարող ես կատարել донат։')
+        return
+    if action == 'failed':
+        await finalize(uid, '❌ Դոնաթը չի հաջողվել.', '❌ <b>Դոնաթը չի հաջողվել.</b>\n\nՊատվերը ավարտվել է առանց հաջողված донат-ի։')
+        await callback.answer('❌ Դոնաթը չի հաջողվել։')
+        return
     if action == 'confirm':
         if not user['receipt_accepted']:
             await callback.answer('⚠️ Նախ հաստատիր չեկը։', show_alert=True)
             return
         if not user.get('verification_type') or not user.get('verification_done'):
-            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator և սպասիր «Պատրաստ է» հաստատմանը։', show_alert=True)
+            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator և սպասիր «Պատրաստ է» հաղորդագրությանը։', show_alert=True)
             return
         await finalize(uid, '📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.', '🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎')
         await callback.answer('📦 Պատվերը ավարտվեց։')
@@ -597,27 +622,6 @@ async def verify(callback: CallbackQuery):
     await callback.message.edit_caption(order_summary(uid, user, f'🔐 Ընտրված է՝ {kind}'), parse_mode='HTML', reply_markup=admin_kb(uid))
     await send_verification(uid, kind)
     await callback.answer('✅ Ուղեցույցը ուղարկվեց հաճախորդին։')
-
-
-@dp.callback_query(F.data == 'verify_done')
-async def verify_done(callback: CallbackQuery):
-    user = get_user(callback.from_user.id)
-    if not user.get('verification_type'):
-        await callback.answer('⚠️ 2FA տարբերակը դեռ ընտրված չէ։', show_alert=True)
-        return
-    user['verification_done'] = True
-    await save_state()
-    await notify(ADMIN_ID, '🟢 <b>ՊԱՏՐԱՍՏ Է</b>\n\n'
-                     f'👤 @{escape(user.get("username") or "չկա")}\n'
-                     f'🆔 Telegram ID՝ <code>{callback.from_user.id}</code>\n'
-                     f'📦 Ապրանք՝ <b>{escape(user.get("product") or "չկա")}</b>\n'
-                     f'💰 Գին՝ <b>{fmt(user.get("price") or 0)} ֏</b>\n'
-                     '🔐 2FA՝ հաստատված է։', admin_kb(callback.from_user.id))
-    try:
-        await callback.message.edit_reply_markup(reply_markup=back_kb('back:main'))
-    except Exception:
-        logging.exception('Could not update client 2FA message')
-    await callback.answer('✅ Հաստատումը ստացվեց։')
 
 
 @dp.callback_query(F.data == 'refundclient:phone')
