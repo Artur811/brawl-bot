@@ -145,7 +145,7 @@ async def finalize(uid,status,client_text):
 
 @dp.message(CommandStart())
 async def start(m):
-    u=get_user(m.from_user.id); u["username"]=m.from_user.username
+    u=get_user(m.from_user.id); u["username"]=m.from_user.username; u["support_waiting"]=False
     await save_state()
     await m.answer(main_text(),reply_markup=main_kb(),parse_mode="HTML")
 
@@ -154,13 +154,13 @@ async def menu(m): await m.answer(main_text(),reply_markup=main_kb(),parse_mode=
 
 @dp.callback_query(F.data.startswith("game:"))
 async def game(c):
-    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None})
+    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None,"support_waiting":False})
     await save_state()
     await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data.startswith("product:"))
 async def product(c):
-    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username})
+    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username,"support_waiting":False})
     if g=="brawlstars" and name in {"Brawl Pass","Brawl Pass+"}:
         u["brawl_pass_type"]="brawl_pass" if name=="Brawl Pass" else "brawl_pass_plus"; u["brawl_pass_waiting"]=True
         await save_state()
@@ -187,30 +187,31 @@ async def text(m):
     u=get_user(m.from_user.id)
 
     if u.get("support_waiting"):
-        support_text=m.text.strip()
-        if not support_text:
-            await m.answer("⚠️ Գրիր հաղորդագրությունը և ուղարկիր այն։")
+        message_text=m.text.strip()
+        if not message_text:
+            await m.answer("⚠️ Գրիր հաղորդագրություն։")
             return
         if not SUPPORT_CHANNEL_ID:
             u["support_waiting"]=False
             await save_state()
             await m.answer("⚠️ Աջակցության ալիքը դեռ կարգավորված չէ։",reply_markup=main_kb())
             return
+        username=f"@{escape(m.from_user.username)}" if m.from_user.username else "չկա"
+        support_text=f"📩 <b>Նոր հաղորդագրություն աջակցությանը</b>\n\n👤 Username՝ {username}\n🆔 Telegram ID՝ <code>{m.from_user.id}</code>\n\n💬 <b>Հաղորդագրություն՝</b>\n{escape(message_text)}"
         try:
-            username=f"@{escape(m.from_user.username)}" if m.from_user.username else "չկա"
-            await bot.send_message(SUPPORT_CHANNEL_ID,f"📩 <b>Նոր հաղորդագրություն աջակցությանը</b>\n\n👤 Username՝ {username}\n🆔 Telegram ID՝ <code>{m.from_user.id}</code>\n\n💬 <b>Հաղորդագրություն՝</b>\n{escape(support_text)}",parse_mode="HTML")
+            await bot.send_message(SUPPORT_CHANNEL_ID,support_text,parse_mode="HTML")
             u["support_waiting"]=False
             await save_state()
-            await m.answer("✅ <b>Հաղորդագրությունը ուղարկվեց աջակցությանը։</b>\n\nՄենք կպատասխանենք հնարավորինս շուտ։",reply_markup=main_kb(),parse_mode="HTML")
+            await m.answer("✅ <b>Հաղորդագրությունը ուղարկվեց աջակցությանը։</b> ❤️‍🔥",reply_markup=main_kb(),parse_mode="HTML")
         except Exception:
-            logging.exception("Could not send support message")
+            logging.exception("support message failed")
             await m.answer("⚠️ Չհաջողվեց ուղարկել հաղորդագրությունը։ Փորձիր կրկին։",reply_markup=main_kb())
         return
 
     if u.get("refund_waiting") and u.get("refund_method") in {"phone","card"} and u.get("refund_details_ready") is False and (u.get("refund_operator") or u.get("refund_method")=="card"):
         u["refund_details_ready"]=True; u["refund_details"]=m.text.strip(); await save_state()
         method="📱 Հեռախոսահամար" if u["refund_method"]=="phone" else "💳 Քարտ"
-        op=f"\n📞 Օպերատոր՝ <b>{escape(u.get('refund_operator') or '-')}</b>" if u.get("refund_operator") else ""
+        op=f"\n📞 Օպերատոր՝ <b>{escape(u.get('refund_operator') or '-')}</b>" if u.get('refund_operator') else ""
         await notify(ADMIN_ID,f"💸 <b>Տվյալները վերադարձի համար</b>\n\n🆔 User ID՝ <code>{m.from_user.id}</code>\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏\n📌 Եղանակ՝ <b>{method}</b>{op}\n📝 Տվյալներ՝ <code>{escape(m.text.strip())}</code>",admin_kb(m.from_user.id,u.get("receipt_accepted",False),True)); await m.answer("✅ Տվյալները ստացվեցին։ Սպասիր վերադարձի հաստատմանը։"); return
 
     if u.get("receipt_waiting_id") or (u.get("payment") in {"receipt_sent","receipt_accepted"} and u.get("receipt_order_message_id")):
@@ -297,7 +298,7 @@ async def rback(c):
 @dp.callback_query(F.data=="contact:open")
 async def contact(c):
     u=get_user(c.from_user.id); u["support_waiting"]=True; await save_state()
-    await c.message.edit_text("📩 <b>Կապվեք մեզ հետ</b>\n\nԳրիր քո հաղորդագրությունը, և մենք կստանանք այն։",reply_markup=back_kb("back:main"),parse_mode="HTML")
+    await c.message.edit_text("📩 <b>Կապվեք մեզ հետ</b>\n\n💬 Գրիր քո հաղորդագրությունը, և մենք կստանանք այն։",reply_markup=back_kb("back:main"),parse_mode="HTML")
     await c.answer()
 
 @dp.callback_query(F.data=="back:main")
