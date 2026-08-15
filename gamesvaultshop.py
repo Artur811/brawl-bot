@@ -181,7 +181,6 @@ def admin_verify_kb(uid):
     return kb([
         [InlineKeyboardButton(text='📧 E-mail', callback_data=f'verify:{uid}:email')],
         [InlineKeyboardButton(text='🔐 Authenticator', callback_data=f'verify:{uid}:authenticator')],
-        [InlineKeyboardButton(text='📱 Այլ սարքով հաստատում', callback_data=f'verify:{uid}:device')],
         [InlineKeyboardButton(text='⬅️ Հետ', callback_data=f'verify_back:{uid}')],
     ])
 
@@ -533,8 +532,8 @@ async def receipt_action(callback: CallbackQuery):
         if not user['receipt_accepted']:
             await callback.answer('⚠️ Նախ հաստատիր չեկը։', show_alert=True)
             return
-        if user.get('verification_type') and not user.get('verification_done'):
-            await callback.answer('⚠️ Սպասիր, մինչև հաճախորդը հաստատի մուտքը 2FA-ով։', show_alert=True)
+        if not user.get('verification_type') or not user.get('verification_done'):
+            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator և սպասիր «Պատրաստ է» հաստատմանը։', show_alert=True)
             return
         await finalize(uid, '📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.', '🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎')
         await callback.answer('📦 Պատվերը ավարտվեց։')
@@ -608,7 +607,12 @@ async def verify_done(callback: CallbackQuery):
         return
     user['verification_done'] = True
     await save_state()
-    await notify(ADMIN_ID, order_summary(callback.from_user.id, user, '🟢 Հաճախորդը հաստատեց 2FA մուտքը։ Կարող եք շարունակել պատվերը.'), admin_kb(callback.from_user.id))
+    await notify(ADMIN_ID, '🟢 <b>ՊԱՏՐԱՍՏ Է</b>\n\n'
+                     f'👤 @{escape(user.get("username") or "չկա")}\n'
+                     f'🆔 Telegram ID՝ <code>{callback.from_user.id}</code>\n'
+                     f'📦 Ապրանք՝ <b>{escape(user.get("product") or "չկա")}</b>\n'
+                     f'💰 Գին՝ <b>{fmt(user.get("price") or 0)} ֏</b>\n'
+                     '🔐 2FA՝ հաստատված է։', admin_kb(callback.from_user.id))
     try:
         await callback.message.edit_reply_markup(reply_markup=back_kb('back:main'))
     except Exception:
