@@ -1,0 +1,120 @@
+name: Patch Games Vault 2FA
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Patch gamesvaultshop.py
+        run: |
+          if git log -1 --pretty=%B | grep -q '\[skip-2fa-update\]'; then exit 0; fi
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+
+          s, n = re.subn(
+              r'VERIFY_IMAGES = \{.*?\n\}',
+              '''VERIFY_IMAGES = {
+              "device": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/a/4/c/b/a4cb7f66e45935445932f8d966013463406a251e.png",
+              "authenticator": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/8/d/a/5/8da5d76034856021ad807288f8c8e8a43c66a8b4.png",
+              "email": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/4/2/6/8/4268f5cf79d76d381d13648d545b8929d562ae08.png",
+          }''', s, count=1, flags=re.S)
+          assert n == 1
+
+          if '"verification_done": False' not in s:
+              s = s.replace('"support_waiting": False, "verification_type": None,', '"support_waiting": False, "verification_type": None, "verification_done": False,', 1)
+
+          s, n = re.subn(
+              r'def admin_verify_kb\(uid\):.*?\n\n\ndef back_kb',
+              '''def admin_verify_kb(uid):
+              return InlineKeyboardMarkup(inline_keyboard=[
+                  [InlineKeyboardButton(text="📧 E-mail", callback_data=f"verify:{uid}:email")],
+                  [InlineKeyboardButton(text="🔐 Authenticator", callback_data=f"verify:{uid}:authenticator")],
+                  [InlineKeyboardButton(text="📱 Այլ սարքով հաստատում", callback_data=f"verify:{uid}:device")],
+                  [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify_back:{uid}")],
+              ])
+
+
+def client_verify_done_kb():
+              return InlineKeyboardMarkup(inline_keyboard=[
+                  [InlineKeyboardButton(text="✅ Մուտքը հաստատեցի", callback_data="verify_done")],
+                  [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")],
+              ])
+
+
+def back_kb''', s, count=1, flags=re.S)
+          assert n == 1
+
+          s, n = re.subn(
+              r'async def send_verification_instruction\(uid, kind\):.*?\n\n\n@dp\.message\(CommandStart\(\)\)',
+              '''async def send_verification_instruction(uid, kind):
+              user = get_user(uid)
+              user["verification_type"] = kind
+              user["verification_done"] = False
+              await save_state()
+              text = verification_text(kind)
+              image = VERIFY_IMAGES.get(kind)
+              try:
+                  if image:
+                      await bot.send_photo(uid, image, caption=text, parse_mode="HTML", reply_markup=client_verify_done_kb())
+                  else:
+                      await bot.send_message(uid, text, parse_mode="HTML", reply_markup=client_verify_done_kb())
+              except Exception:
+                  logging.exception("verification image/message failed")
+                  await notify(uid, text, client_verify_done_kb())
+
+
+@dp.message(CommandStart())''', s, count=1, flags=re.S)
+          assert n == 1
+
+          old = '        await finalize(uid, "📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.", "🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\\n\\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎")'
+          new = '        if user.get("verification_type") and not user.get("verification_done"):\n            await callback.answer("⚠️ Սպասիր, մինչև հաճախորդը հաստատի մուտքը 2FA-ով։", show_alert=True)\n            return\n' + old
+          assert old in s
+          s = s.replace(old, new, 1)
+
+          marker = '@dp.callback_query(F.data.startswith("refundclient:operator:"))'
+          handler = '''@dp.callback_query(F.data == "verify_done")
+async def verify_done(callback: CallbackQuery):
+              uid = callback.from_user.id
+              user = get_user(uid)
+              if not user.get("verification_type"):
+                  await callback.answer("⚠️ Այս պահին 2FA ստուգում ընտրված չէ։", show_alert=True)
+                  return
+              user["verification_done"] = True
+              await save_state()
+              await notify(ADMIN_ID, order_summary(uid, user, "🟢 Հաճախորդը հաստատեց 2FA մուտքը։ Կարող եք շարունակել պատվերը."), admin_kb(uid, True, user.get("refund_details_ready", False)))
+              try:
+                  await callback.message.edit_reply_markup(reply_markup=back_kb("back:main"))
+              except Exception:
+                  logging.exception("Could not update client 2FA message")
+              await callback.answer("✅ Հաստատումը ստացվեց։")
+
+
+'''
+          assert marker in s
+          s = s.replace(marker, handler + marker, 1)
+
+          s = s.replace('    user["verification_type"] = kind\n    await save_state()\n    await callback.message.edit_caption', '    user["verification_type"] = kind\n    user["verification_done"] = False\n    await save_state()\n    await callback.message.edit_caption', 1)
+
+          p.write_text(s, encoding='utf-8')
+          print('PATCH_OK')
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gamesvaultshop.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix Roblox 2FA client flow [skip-2fa-update]'
+          git push
