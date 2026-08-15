@@ -36,7 +36,7 @@ CATALOG = {
 
 
 def blank_user():
-    return {"game":None,"product":None,"price":None,"username":None,"payment":None,"order_id":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"refund_waiting":False,"refund_method":None,"refund_operator":None,"refund_details_ready":False,"game_id":None}
+    return {"game":None,"product":None,"price":None,"username":None,"payment":None,"order_id":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"refund_waiting":False,"refund_method":None,"refund_operator":None,"refund_details_ready":False,"game_id":None,"support_waiting":False}
 
 
 def load_state():
@@ -144,7 +144,7 @@ async def finalize(uid,status,client_text):
 
 @dp.message(CommandStart())
 async def start(m):
-    u=get_user(m.from_user.id); u["username"]=m.from_user.username
+    u=get_user(m.from_user.id); u["username"]=m.from_user.username; u["support_waiting"]=False
     await save_state()
     await m.answer(main_text(),reply_markup=main_kb(),parse_mode="HTML")
 
@@ -153,13 +153,13 @@ async def menu(m): await m.answer(main_text(),reply_markup=main_kb(),parse_mode=
 
 @dp.callback_query(F.data.startswith("game:"))
 async def game(c):
-    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None})
+    g=c.data.split(":",1)[1]; u=get_user(c.from_user.id); u.update({"game":g,"product":None,"price":None,"payment":None,"brawl_pass_type":None,"brawl_pass_waiting":False,"receipt_waiting_id":False,"receipt_order_message_id":None,"receipt_accepted":False,"game_id":None,"support_waiting":False})
     await save_state()
     await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։\n\n💰 Բոլոր գները նշված են դրամով։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data.startswith("product:"))
 async def product(c):
-    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username})
+    _,g,i=c.data.split(":"); name,price=CATALOG[g]["items"][int(i)]; u=get_user(c.from_user.id); u.update({"game":g,"product":name,"price":price,"username":c.from_user.username,"support_waiting":False})
     if g=="brawlstars" and name in {"Brawl Pass","Brawl Pass+"}:
         u["brawl_pass_type"]="brawl_pass" if name=="Brawl Pass" else "brawl_pass_plus"; u["brawl_pass_waiting"]=True
         await save_state()
@@ -185,6 +185,27 @@ async def photo(m):
 async def text(m):
     u=get_user(m.from_user.id)
 
+    if u.get("support_waiting"):
+        support_text=m.text.strip()
+        if not support_text:
+            await m.answer("⚠️ Գրիր հաղորդագրությունը և ուղարկիր այն։")
+            return
+        if not SUPPORT_CHANNEL_ID:
+            u["support_waiting"]=False
+            await save_state()
+            await m.answer("⚠️ Աջակցության ալիքը դեռ կարգավորված չէ։",reply_markup=main_kb())
+            return
+        try:
+            username=f"@{escape(m.from_user.username)}" if m.from_user.username else "չկա"
+            await bot.send_message(SUPPORT_CHANNEL_ID,f"📩 <b>Նոր հաղորդագրություն աջակցությանը</b>\n\n👤 Username՝ {username}\n🆔 Telegram ID՝ <code>{m.from_user.id}</code>\n\n💬 <b>Հաղորդագրություն՝</b>\n{escape(support_text)}",parse_mode="HTML")
+            u["support_waiting"]=False
+            await save_state()
+            await m.answer("✅ <b>Հաղորդագրությունը ուղարկվեց աջակցությանը։</b>\n\nՄենք կպատասխանենք հնարավորինս շուտ։",reply_markup=main_kb(),parse_mode="HTML")
+        except Exception:
+            logging.exception("Could not send support message")
+            await m.answer("⚠️ Չհաջողվեց ուղարկել հաղորդագրությունը։ Փորձիր կրկին։",reply_markup=main_kb())
+        return
+
     # Refund details have priority.
     if u.get("refund_waiting") and u.get("refund_method") in {"phone","card"} and u.get("refund_details_ready") is False and (u.get("refund_operator") or u.get("refund_method")=="card"):
         u["refund_details_ready"]=True; u["refund_details"]=m.text.strip(); await save_state()
@@ -192,8 +213,6 @@ async def text(m):
         op=f"\n📞 Օպերատոր՝ <b>{escape(u.get('refund_operator') or '-')}</b>" if u.get("refund_operator") else ""
         await notify(ADMIN_ID,f"💸 <b>Տվյալները վերադարձի համար</b>\n\n🆔 User ID՝ <code>{m.from_user.id}</code>\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏\n📌 Եղանակ՝ <b>{method}</b>{op}\n📝 Տվյալներ՝ <code>{escape(m.text.strip())}</code>",admin_kb(m.from_user.id,u.get("receipt_accepted",False),True)); await m.answer("✅ Տվյալները ստացվեցին։ Սպասիր վերադարձի հաստատմանը։"); return
 
-    # FIX: after a receipt, the next text is the customer's game ID.
-    # This also works when the process was restarted and the state was restored from orders_state.json.
     if u.get("receipt_waiting_id") or (u.get("payment") in {"receipt_sent","receipt_accepted"} and u.get("receipt_order_message_id")):
         game_id=m.text.strip()
         if not game_id:
@@ -276,18 +295,21 @@ async def rback(c):
     u=get_user(c.from_user.id); u["refund_method"]=None; u["refund_operator"]=None; u["refund_details_ready"]=False; await save_state(); await c.message.edit_text("💸 <b>Ընտրիր վերադարձի եղանակը</b>։",reply_markup=refund_method_kb(),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data=="contact:open")
-async def contact(c): await c.answer("📩 Կապվեք մեզ հետ՝ գրեք հաղորդագրություն։",show_alert=True)
+async def contact(c):
+    u=get_user(c.from_user.id); u["support_waiting"]=True; await save_state()
+    await c.message.answer("📩 <b>Գրիր քո հաղորդագրությունը</b>։\n\nՈւղարկիր այն հաջորդ հաղորդագրությամբ, և մենք կստանանք այն։",parse_mode="HTML",reply_markup=back_kb("back:main")); await c.answer()
 
 @dp.callback_query(F.data=="back:main")
-async def bmain(c): await c.message.edit_text(main_text(),reply_markup=main_kb(),parse_mode="HTML"); await c.answer()
+async def bmain(c):
+    u=get_user(c.from_user.id); u["support_waiting"]=False; await save_state(); await c.message.edit_text(main_text(),reply_markup=main_kb(),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data.startswith("back:game:"))
 async def bgame(c):
-    g=c.data.split(":",2)[2]; u=get_user(c.from_user.id); u["brawl_pass_waiting"]=False; await save_state(); await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
+    g=c.data.split(":",2)[2]; u=get_user(c.from_user.id); u["brawl_pass_waiting"]=False; u["support_waiting"]=False; await save_state(); await c.message.edit_text(f"{CATALOG[g]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։",reply_markup=game_kb(g),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data=="back:product")
 async def bprod(c):
-    u=get_user(c.from_user.id); await c.message.edit_text(f"🛒 <b>Ձեր ընտրությունը</b>\n\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏",reply_markup=product_kb(u['game']),parse_mode="HTML"); await c.answer()
+    u=get_user(c.from_user.id); u["support_waiting"]=False; await c.message.edit_text(f"🛒 <b>Ձեր ընտրությունը</b>\n\n📦 {escape(u.get('product') or '')}\n💰 {fmt(u.get('price') or 0)} ֏",reply_markup=product_kb(u['game']),parse_mode="HTML"); await c.answer()
 
 @dp.callback_query(F.data=="back:payment")
 async def bpay(c): await buy(c)
