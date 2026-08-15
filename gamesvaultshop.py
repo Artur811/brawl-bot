@@ -174,6 +174,8 @@ def admin_kb(uid):
         if user.get('verification_done'):
             rows.append([InlineKeyboardButton(text='🟢 Պատրաստ է', callback_data=f'receipt:ready:{uid}')])
             rows.append([InlineKeyboardButton(text='❌ Դոնաթը չի հաջողվել', callback_data=f'receipt:failed:{uid}')])
+        if user.get('verification_type'):
+            rows.append([InlineKeyboardButton(text='🔁 Կրկին ուղարկել', callback_data=f'receipt:resend:{uid}')])
         rows.append([InlineKeyboardButton(text='📦 Հաստատել պատվերը', callback_data=f'receipt:confirm:{uid}')])
     if user['refund_details_ready']:
         rows.append([InlineKeyboardButton(text='✅ Հետ գումարի վերադարձը ավարտված է', callback_data=f'receipt:refund_complete:{uid}')])
@@ -542,6 +544,15 @@ async def receipt_action(callback: CallbackQuery):
         await callback.message.edit_caption(order_summary(uid, user, '✅ Չեկը հաստատված է։ Ընտրիր հաջորդ գործողությունը.'), parse_mode='HTML', reply_markup=admin_kb(uid))
         await notify(uid, '✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է։')
         await callback.answer('✅ Չեկը հաստատվեց։')
+        return
+    if action == 'resend':
+        if not user.get('verification_type'):
+            await callback.answer('⚠️ Նախ ընտրիր E-mail կամ Authenticator։', show_alert=True)
+            return
+        user['verification_done'] = False
+        await save_state()
+        await send_verification(uid, user['verification_type'])
+        await callback.answer('🔁 Հրահանգը կրկին ուղարկվեց հաճախորդին։')
         return
     if action == 'ready':
         if not user.get('verification_done'):
