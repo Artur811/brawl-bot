@@ -1,0 +1,118 @@
+name: Patch Brawl Pass screenshot flow
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  patch:
+    if: "!contains(github.event.head_commit.message, '[skip-brawl-pass]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Brawl Pass flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace(
+              'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup',
+              'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto',
+              1,
+          )
+
+          s = s.replace(
+              "'brawl_pass_waiting': False, 'receipt_waiting_id': False,",
+              "'brawl_pass_waiting': False, 'pass_admin_message_id': None, 'receipt_waiting_id': False,",
+              1,
+          )
+
+          old = """        sent = await bot.send_photo(
+            ORDER_CHANNEL_ID, message.photo[-1].file_id,
+            caption=(f'📸 <b>BRAWL PASS SCREENSHOT</b>\\n\\n👤 @{escape(message.from_user.username or \"չկա\")}\\n'
+                     f'🆔 <code>{message.from_user.id}</code>\\n📦 <b>{title}</b>\\n\\n'
+                     f'💰 Ընտրիր ճիշտ գինը՝ {fmt(low)} ֏ / {fmt(high)} ֏'),
+            parse_mode='HTML',
+            reply_markup=kb([[InlineKeyboardButton(text=f'💰 {fmt(low)} ֏', callback_data=f'passprice:{message.from_user.id}:{low}'),
+                              InlineKeyboardButton(text=f'💰 {fmt(high)} ֏', callback_data=f'passprice:{message.from_user.id}:{high}')]]))
+        user['brawl_pass_waiting'] = False
+        user['pass_admin_message_id'] = sent.message_id
+        await save_state()
+        await message.answer('✅ Screenshot-ը ստացվեց։ Ադմինը կընտրի ճիշտ գինը։', reply_markup=main_kb())
+        return
+"""
+          new = """        caption = (f'📸 <b>BRAWL PASS SCREENSHOT</b>\\n\\n👤 @{escape(message.from_user.username or \"չկա\")}\\n'
+                   f'🆔 <code>{message.from_user.id}</code>\\n📦 <b>{title}</b>\\n\\n'
+                   f'💰 Ընտրիր ճիշտ գինը՝ {fmt(low)} ֏ / {fmt(high)} ֏')
+        markup = kb([
+            [InlineKeyboardButton(text=f'💰 {fmt(low)} ֏', callback_data=f'passprice:{message.from_user.id}:{low}'),
+             InlineKeyboardButton(text=f'💰 {fmt(high)} ֏', callback_data=f'passprice:{message.from_user.id}:{high}')],
+            [InlineKeyboardButton(text='❌ Սխալ կամ վատ տեսանելի screenshot', callback_data=f'pass_bad:{message.from_user.id}')],
+        ])
+
+        old_message_id = user.get('pass_admin_message_id')
+        if old_message_id:
+            try:
+                await bot.edit_message_media(
+                    chat_id=ORDER_CHANNEL_ID,
+                    message_id=old_message_id,
+                    media=InputMediaPhoto(media=message.photo[-1].file_id, caption=caption, parse_mode='HTML'),
+                    reply_markup=markup,
+                )
+                user['brawl_pass_waiting'] = False
+                await save_state()
+                await message.answer('✅ Նոր screenshot-ը ստացվեց և փոխարինեց նախորդը։ Ադմինը նորից կընտրի ճիշտ գինը։', reply_markup=main_kb())
+                return
+            except Exception:
+                logging.exception('Could not replace Brawl Pass screenshot; sending a new one')
+
+        sent = await bot.send_photo(
+            ORDER_CHANNEL_ID, message.photo[-1].file_id,
+            caption=caption,
+            parse_mode='HTML',
+            reply_markup=markup)
+        user['brawl_pass_waiting'] = False
+        user['pass_admin_message_id'] = sent.message_id
+        await save_state()
+        await message.answer('✅ Screenshot-ը ստացվեց։ Ադմինը կընտրի ճիշտ գինը։', reply_markup=main_kb())
+        return
+"""
+          assert old in s, 'Brawl Pass photo block not found'
+          s = s.replace(old, new, 1)
+
+          marker = "\n\n@dp.message(F.photo)\nasync def photo_router(message: Message):"
+          handler = """
+
+@dp.callback_query(F.data.startswith('pass_bad:'))
+async def pass_bad(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer('⛔ Միայն ադմինին։', show_alert=True)
+        return
+    uid = int(callback.data.split(':')[1])
+    user = get_user(uid)
+    if not user.get('brawl_pass_type') and not user.get('pass_admin_message_id'):
+        await callback.answer('⚠️ Այս screenshot-ի պատվերը այլևս ակտիվ չէ։', show_alert=True)
+        return
+    user['brawl_pass_waiting'] = True
+    await save_state()
+    await notify(uid, '❌ <b>Սխալ կամ վատ տեսանելի screenshot</b>։\\n\\n📸 Խնդրում ենք ուղարկել նոր, ավելի հստակ screenshot, որտեղ ամբողջությամբ երևում է Brawl Pass-ի կամ Brawl Pass+-ի գինը։')
+    await callback.answer('📸 Հաճախորդին ուղարկվեց նոր screenshot ուղարկելու խնդրանքը։')
+"""
+          assert marker in s, 'photo router marker not found'
+          s = s.replace(marker, handler + marker, 1)
+
+          p.write_text(s, encoding='utf-8')
+          print('PATCH_OK')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gamesvaultshop.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add Brawl Pass screenshot replacement [skip-brawl-pass]'
+          git push
