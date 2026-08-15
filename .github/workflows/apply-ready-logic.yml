@@ -1,0 +1,24 @@
+name: Apply ready logic
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-ready-logic.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: python .github/patch_ready_logic.py
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gamesvaultshop.py
+          git diff --cached --quiet || git commit -m 'Fix admin ready and donation failed statuses'
+          git push
