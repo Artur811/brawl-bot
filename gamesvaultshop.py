@@ -168,6 +168,7 @@ def admin_kb(uid):
     rows = [
         [InlineKeyboardButton(text='❌ Մերժել չեկը', callback_data=f'receipt:reject:{uid}'), InlineKeyboardButton(text='✅ Հաստատել չեկը', callback_data=f'receipt:accept:{uid}')],
         [InlineKeyboardButton(text='💸 Տրամադրել հետ գումարը', callback_data=f'receipt:refund:{uid}')],
+        [InlineKeyboardButton(text='❌ Սխալ ID', callback_data=f'receipt:wrong_id:{uid}')],
     ]
     if user['receipt_accepted']:
         rows.append([InlineKeyboardButton(text='🔐 2FA', callback_data=f'verify_menu:{uid}')])
@@ -721,6 +722,30 @@ async def back_product(callback: CallbackQuery):
 @dp.callback_query(F.data == 'back:payment')
 async def back_payment(callback: CallbackQuery):
     await buy_confirm(callback)
+
+
+@dp.callback_query(F.data.startswith('receipt:wrong_id:'))
+async def receipt_wrong_id(callback: CallbackQuery):
+    parts = callback.data.split(':')
+    if len(parts) != 3:
+        await callback.answer('❌ Սխալ գործողություն։', show_alert=True)
+        return
+    try:
+        uid = int(parts[2])
+    except ValueError:
+        await callback.answer('❌ Սխալ օգտատիրոջ ID։', show_alert=True)
+        return
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer('⛔ Այս կոճակը հասանելի է միայն ադմինին։', show_alert=True)
+        return
+    user = get_user(uid)
+    user['receipt_waiting_id'] = True
+    await save_state()
+    await notify(uid,
+        '⚠️ <b>Մուտքագրված ID-ն սխալ է։</b>\n\n'
+        '🆔 Խնդրում ենք կրկին ուղարկել ճիշտ Game ID / Username-ը։')
+    await callback.answer('📩 Հաճախորդին ուղարկվեց նոր ID ուղարկելու հարցումը։')
+
 
 
 async def health(request):
