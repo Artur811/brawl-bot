@@ -1,0 +1,44 @@
+name: Add wrong ID button
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch gamesvaultshop.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+
+          old = """        [InlineKeyboardButton(text='💸 Տրամադրել հետ գումարը', callback_data=f'receipt:refund:{uid}')],\n    ]\n    if user['receipt_accepted']:"""
+          new = """        [InlineKeyboardButton(text='💸 Տրամադրել հետ գումարը', callback_data=f'receipt:refund:{uid}')],\n        [InlineKeyboardButton(text='❌ Սխալ ID', callback_data=f'receipt:wrong_id:{uid}')],\n    ]\n    if user['receipt_accepted']:"""
+          if old not in s:
+              raise SystemExit('admin_kb target not found')
+          s = s.replace(old, new, 1)
+
+          marker = "\n\nasync def health(request):"
+          handler = '''\n\n@dp.callback_query(F.data.startswith('receipt:wrong_id:'))\nasync def receipt_wrong_id(callback: CallbackQuery):\n    parts = callback.data.split(':')\n    if len(parts) != 3:\n        await callback.answer('❌ Սխալ գործողություն։', show_alert=True)\n        return\n    try:\n        uid = int(parts[2])\n    except ValueError:\n        await callback.answer('❌ Սխալ օգտատիրոջ ID։', show_alert=True)\n        return\n    if callback.from_user.id != ADMIN_ID:\n        await callback.answer('⛔ Այս կոճակը հասանելի է միայն ադմինին։', show_alert=True)\n        return\n    user = get_user(uid)\n    user['receipt_waiting_id'] = True\n    await save_state()\n    await notify(uid,\n        '⚠️ <b>Մուտքագրված ID-ն սխալ է։</b>\\n\\n'\n        '🆔 Խնդրում ենք կրկին ուղարկել ճիշտ Game ID / Username-ը։')\n    await callback.answer('📩 Հաճախորդին ուղարկվեց նոր ID ուղարկելու հարցումը։')\n\n'''
+          if marker not in s:
+              raise SystemExit('health marker not found')
+          s = s.replace(marker, handler + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gamesvaultshop.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add admin wrong ID button'
+          git push
