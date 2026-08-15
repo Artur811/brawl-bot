@@ -159,7 +159,7 @@ def receipt_kb():
 def admin_kb(uid, accepted=False, refund_ready=False):
     user = get_user(uid)
     rows = [[InlineKeyboardButton(text="❌ Մերժել չեկը", callback_data=f"receipt:reject:{uid}"), InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}")], [InlineKeyboardButton(text="💸 Տրամադրել հետ գումարը", callback_data=f"receipt:refund:{uid}")]]
-    if accepted and user.get("game") == "roblox":
+    if accepted:
         rows.append([InlineKeyboardButton(text="🔐 2FA", callback_data=f"verify_menu:{uid}")])
     if accepted:
         rows.append([InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"receipt:confirm:{uid}")])
@@ -215,11 +215,15 @@ async def finalize(uid, status, client_text):
     user = get_user(uid)
     message_id = user.get("receipt_order_message_id")
     if message_id and ORDER_CHANNEL_ID:
-        try: await bot.delete_message(ORDER_CHANNEL_ID, message_id)
-        except Exception: logging.exception("delete order message failed")
+        try:
+            await bot.delete_message(ORDER_CHANNEL_ID, message_id)
+        except Exception:
+            logging.exception("delete order message failed")
     if ORDER_CHANNEL_ID:
-        try: await bot.send_message(ORDER_CHANNEL_ID, final_status(uid, user, status), parse_mode="HTML")
-        except Exception: logging.exception("final status message failed")
+        try:
+            await bot.send_message(ORDER_CHANNEL_ID, final_status(uid, user, status), parse_mode="HTML")
+        except Exception:
+            logging.exception("final status message failed")
     await notify(uid, client_text, main_kb())
     users[uid] = blank_user()
     await save_state()
@@ -227,14 +231,14 @@ async def finalize(uid, status, client_text):
 
 def verification_text(kind):
     if kind == "email":
-        return "🔐 <b>Roblox — հաստատում E-mail-ով</b>\n\n1️⃣ Բացիր քո Roblox հաշվի հաստատված E-mail-ը։\n2️⃣ Գտիր Roblox-ի անվտանգության հաղորդագրությունը։\n3️⃣ Հաստատումը կատարիր միայն Roblox-ի պաշտոնական հավելվածում կամ roblox.com-ի պաշտոնական էջում, երբ Roblox-ը դա պահանջում է։\n\n⚠️ <b>Ոչ մի E-mail-ի կոդ մի ուղարկիր Games Vault Shop-ին կամ ադմինին։</b>\n⚠️ Եթե հաղորդագրությունը կամ մուտքի փորձը քոնը չէ՝ մի հաստատիր այն։"
+        return "📧 <b>2FA — E-mail-аутентификация</b>\n\n1️⃣ Открой подтверждённый E-mail, привязанный к аккаунту.\n2️⃣ Найди письмо с запросом подтверждения входа.\n3️⃣ Подтверди вход только если это действительно твой вход и ты сам его начал.\n\n⚠️ <b>Никакие E-mail-коды не отправляй Games Vault Shop или админу.</b>\n⚠️ Если запрос не твой — не подтверждай его."
     if kind == "authenticator":
-        return "🔐 <b>Roblox — Authenticator 2FA</b>\n\n1️⃣ Բացիր քո Authenticator հավելվածը։\n2️⃣ Գտիր Roblox-ի համար նախատեսված հաստատման կոդը։\n3️⃣ Կոդը մուտքագրիր միայն Roblox-ի պաշտոնական հավելվածում կամ roblox.com-ի պաշտոնական էջում։\n\n⚠️ <b>Authenticator-ի կոդը երբեք մի ուղարկիր Games Vault Shop-ին կամ ադմինին։</b>\n⚠️ Եթե հաստատումը քո կողմից չի սկսվել՝ մերժիր այն։"
-    return "📱 <b>Roblox — հաստատում այլ սարքով</b>\n\n1️⃣ Բացիր Roblox-ը այն սարքում, որտեղ քո հաշիվն արդեն մուտք գործած է։\n2️⃣ Ստուգիր, որ մուտքի փորձը քոնն է։\n3️⃣ Միայն քո մուտքի դեպքում հաստատիր այն։\n\n⚠️ Եթե դու չես սկսել մուտքը՝ մերժիր հարցումը։\n⚠️ Games Vault Shop-ը երբեք չի խնդրում գաղտնաբառ, OTP կամ 2FA կոդ։"
+        return "🔐 <b>2FA — Authenticator</b>\n\n1️⃣ Открой своё приложение Authenticator.\n2️⃣ Используй код только на официальной странице/в приложении сервиса.\n3️⃣ Подтверждай вход только если ты сам начал его.\n\n⚠️ <b>Код Authenticator никогда не отправляй Games Vault Shop или админу.</b>\n⚠️ Если запрос не твой — отклони его."
+    return "📱 <b>2FA — подтверждение через другое устройство</b>\n\n1️⃣ Открой устройство, на котором твой аккаунт уже авторизован.\n2️⃣ Проверь уведомление о входе.\n3️⃣ Подтверди только тот вход, который ты сам начал.\n\n⚠️ Если вход не твой — отклони запрос.\n⚠️ Games Vault Shop никогда не просит пароль, OTP или 2FA-код."
 
 
 def verification_caption(kind):
-    return {"email": "📧 Roblox 2FA — E-mail", "authenticator": "🔐 Roblox 2FA — Authenticator", "device": "📱 Roblox — Այլ սարքով հաստատում"}[kind]
+    return {"email": "📧 2FA — E-mail", "authenticator": "🔐 2FA — Authenticator", "device": "📱 2FA — другое устройство"}[kind]
 
 
 async def send_verification_instruction(uid, kind):
@@ -244,8 +248,10 @@ async def send_verification_instruction(uid, kind):
     text = verification_text(kind)
     image = VERIFY_IMAGES.get(kind)
     try:
-        if image: await bot.send_photo(uid, image, caption=text, parse_mode="HTML")
-        else: await bot.send_message(uid, text, parse_mode="HTML")
+        if image:
+            await bot.send_photo(uid, image, caption=text, parse_mode="HTML")
+        else:
+            await bot.send_message(uid, text, parse_mode="HTML")
     except Exception:
         logging.exception("verification image/message failed")
         await notify(uid, text)
@@ -253,7 +259,11 @@ async def send_verification_instruction(uid, kind):
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    user = get_user(message.from_user.id); user["username"] = message.from_user.username; user["support_waiting"] = False; await save_state(); await message.answer(main_text(), reply_markup=main_kb(), parse_mode="HTML")
+    user = get_user(message.from_user.id)
+    user["username"] = message.from_user.username
+    user["support_waiting"] = False
+    await save_state()
+    await message.answer(main_text(), reply_markup=main_kb(), parse_mode="HTML")
 
 
 @dp.message(Command("menu"))
@@ -265,34 +275,64 @@ async def menu(message: Message):
 async def choose_game(callback: CallbackQuery):
     game = callback.data.split(":", 1)[1]
     if game not in CATALOG:
-        await callback.answer("❌ Սխալ խաղ։", show_alert=True); return
+        await callback.answer("❌ Սխալ խաղ։", show_alert=True)
+        return
     user = get_user(callback.from_user.id)
     user.update({"game": game, "product": None, "price": None, "payment": None, "brawl_pass_type": None, "brawl_pass_waiting": False, "receipt_waiting_id": False, "receipt_order_message_id": None, "receipt_accepted": False, "game_id": None, "support_waiting": False, "verification_type": None, "refund_waiting": False, "refund_method": None, "refund_operator": None, "refund_details_ready": False, "refund_details": None})
-    await save_state(); await callback.message.edit_text(f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։", reply_markup=game_kb(game), parse_mode="HTML"); await callback.answer()
+    await save_state()
+    await callback.message.edit_text(f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։", reply_markup=game_kb(game), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("product:"))
 async def choose_product(callback: CallbackQuery):
     _, game, index = callback.data.split(":")
-    try: name, price = CATALOG[game]["items"][int(index)]
-    except (KeyError, ValueError, IndexError): await callback.answer("❌ Սխալ ապրանք։", show_alert=True); return
-    user = get_user(callback.from_user.id); user.update({"game": game, "product": name, "price": price, "username": callback.from_user.username, "support_waiting": False})
+    try:
+        name, price = CATALOG[game]["items"][int(index)]
+    except (KeyError, ValueError, IndexError):
+        await callback.answer("❌ Սխալ ապրանք։", show_alert=True)
+        return
+    user = get_user(callback.from_user.id)
+    user.update({"game": game, "product": name, "price": price, "username": callback.from_user.username, "support_waiting": False})
     if game == "brawlstars" and name in {"Brawl Pass", "Brawl Pass+"}:
-        user["brawl_pass_type"] = "brawl_pass" if name == "Brawl Pass" else "brawl_pass_plus"; user["brawl_pass_waiting"] = True; await save_state(); await callback.message.edit_text(f"📸 <b>Ուղարկիր screenshot-ը, որտեղ հստակ երևում է քո {escape(name)}-ի գինը։</b>\n\n👨‍💼 Screenshot-ը կստանա ադմինը և ինքը կընտրի ճիշտ գինը։", reply_markup=back_kb("back:game:brawlstars"), parse_mode="HTML"); await callback.answer(); return
-    await save_state(); await callback.message.edit_text("🛒 <b>Ձեր ընտրությունը</b>\n\n" + f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n📦 Ապրանք՝ <b>{escape(name)}</b>\n💰 Գին՝ <b>{fmt(price)} ֏</b>\n\nՇարունակե՞լ պատվերը։", reply_markup=product_kb(game), parse_mode="HTML"); await callback.answer()
+        user["brawl_pass_type"] = "brawl_pass" if name == "Brawl Pass" else "brawl_pass_plus"
+        user["brawl_pass_waiting"] = True
+        await save_state()
+        await callback.message.edit_text(f"📸 <b>Ուղարկիր screenshot-ը, որտեղ հստակ երևում է քո {escape(name)}-ի գինը։</b>\n\n👨‍💼 Screenshot-ը կստանա ադմինը և ինքը կընտրի ճիշտ գինը։", reply_markup=back_kb("back:game:brawlstars"), parse_mode="HTML")
+        await callback.answer()
+        return
+    await save_state()
+    await callback.message.edit_text("🛒 <b>Ձեր ընտրությունը</b>\n\n" + f"🎮 Խաղ՝ <b>{escape(CATALOG[game]['name'])}</b>\n📦 Ապրանք՝ <b>{escape(name)}</b>\n💰 Գին՝ <b>{fmt(price)} ֏</b>\n\nՇարունակե՞լ պատվերը։", reply_markup=product_kb(game), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.message(F.photo)
 async def photo_router(message: Message):
     user = get_user(message.from_user.id)
     if user.get("brawl_pass_waiting"):
-        if not ORDER_CHANNEL_ID: await message.answer("⚠️ Պատվերների ալիքը կարգավորված չէ։"); return
-        user["brawl_pass_waiting"] = False; pass_type = user["brawl_pass_type"]; low, high = BRAWL_PASS_PRICES[pass_type]; title = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
+        if not ORDER_CHANNEL_ID:
+            await message.answer("⚠️ Պատվերների ալիքը կարգավորված չէ։")
+            return
+        user["brawl_pass_waiting"] = False
+        pass_type = user["brawl_pass_type"]
+        low, high = BRAWL_PASS_PRICES[pass_type]
+        title = "Brawl Pass" if pass_type == "brawl_pass" else "Brawl Pass+"
         sent = await bot.send_photo(ORDER_CHANNEL_ID, message.photo[-1].file_id, caption=f"📸 <b>BRAWL PASS SCREENSHOT</b>\n\n👤 @{escape(message.from_user.username or 'չկա')}\n🆔 <code>{message.from_user.id}</code>\n📦 <b>{title}</b>\n\n💰 Ընտրիր ճիշտ գինը՝ {fmt(low)} ֏ / {fmt(high)} ֏", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f"💰 {fmt(low)} ֏", callback_data=f"passprice:{message.from_user.id}:{low}"), InlineKeyboardButton(text=f"💰 {fmt(high)} ֏", callback_data=f"passprice:{message.from_user.id}:{high}")]]))
-        user["pass_admin_message_id"] = sent.message_id; await save_state(); await message.answer("✅ Screenshot-ը ստացվեց։ Ադմինը կընտրի ճիշտ գինը։", reply_markup=main_kb()); return
-    if user.get("payment") != "receipt_pending": return
-    user["payment"] = "receipt_sent"; user["order_id"] = f"{message.from_user.id}-{message.message_id}"; user["username"] = message.from_user.username; user["receipt_accepted"] = False; user["receipt_waiting_id"] = True; user["game_id"] = None
-    sent = await bot.send_photo(ORDER_CHANNEL_ID, message.photo[-1].file_id, caption=order_summary(message.from_user.id, user, "⏳ Չեկը սպասում է ադմինի ստուգմանը։"), parse_mode="HTML", reply_markup=admin_kb(message.from_user.id)); user["receipt_order_message_id"] = sent.message_id; await save_state()
+        user["pass_admin_message_id"] = sent.message_id
+        await save_state()
+        await message.answer("✅ Screenshot-ը ստացվեց։ Ադմինը կընտրի ճիշտ գինը։", reply_markup=main_kb())
+        return
+    if user.get("payment") != "receipt_pending":
+        return
+    user["payment"] = "receipt_sent"
+    user["order_id"] = f"{message.from_user.id}-{message.message_id}"
+    user["username"] = message.from_user.username
+    user["receipt_accepted"] = False
+    user["receipt_waiting_id"] = True
+    user["game_id"] = None
+    sent = await bot.send_photo(ORDER_CHANNEL_ID, message.photo[-1].file_id, caption=order_summary(message.from_user.id, user, "⏳ Չեկը սպասում է ադմինի ստուգմանը։"), parse_mode="HTML", reply_markup=admin_kb(message.from_user.id))
+    user["receipt_order_message_id"] = sent.message_id
+    await save_state()
     await message.answer("💎 <b>Չեկը ստացվեց։</b> ❤️‍🔥\n\n🆔 Հիմա ուղարկիր քո Game ID / Username-ը։\n\n⚠️ Գաղտնաբառ, E-mail-ի կոդ կամ Authenticator-ի կոդ մի ուղարկիր.", parse_mode="HTML")
 
 
@@ -300,148 +340,275 @@ async def photo_router(message: Message):
 async def text_router(message: Message):
     user = get_user(message.from_user.id)
     if user.get("support_waiting"):
-        if not SUPPORT_CHANNEL_ID: user["support_waiting"] = False; await save_state(); await message.answer("⚠️ Աջակցության ալիքը դեռ կարգավորված չէ։", reply_markup=main_kb()); return
+        if not SUPPORT_CHANNEL_ID:
+            user["support_waiting"] = False
+            await save_state()
+            await message.answer("⚠️ Աջակցության ալիքը դեռ կարգավորված չէ։", reply_markup=main_kb())
+            return
         support_text = f"📩 <b>Նոր հաղորդագրություն աջակցությանը</b>\n\n👤 Username՝ @{escape(message.from_user.username or 'չկա')}\n🆔 Telegram ID՝ <code>{message.from_user.id}</code>\n\n💬 {escape(message.text.strip())}"
-        try: await bot.send_message(SUPPORT_CHANNEL_ID, support_text, parse_mode="HTML"); user["support_waiting"] = False; await save_state(); await message.answer("✅ <b>Հաղորդագրությունը ուղարկվեց աջակցությանը։</b> ❤️‍🔥", reply_markup=main_kb(), parse_mode="HTML")
-        except Exception: logging.exception("support message failed"); await message.answer("⚠️ Չհաջողվեց ուղարկել հաղորդագրությունը։")
+        try:
+            await bot.send_message(SUPPORT_CHANNEL_ID, support_text, parse_mode="HTML")
+            user["support_waiting"] = False
+            await save_state()
+            await message.answer("✅ <b>Հաղորդագրությունը ուղարկվեց աջակցությանը։</b> ❤️‍🔥", reply_markup=main_kb(), parse_mode="HTML")
+        except Exception:
+            logging.exception("support message failed")
+            await message.answer("⚠️ Չհաջողվեց ուղարկել հաղորդագրությունը։")
         return
     if user.get("refund_waiting") and user.get("refund_method") in {"phone", "card"} and not user.get("refund_details_ready") and (user.get("refund_operator") or user.get("refund_method") == "card"):
-        user["refund_details_ready"] = True; user["refund_details"] = message.text.strip(); method = "📱 Հեռախոսահամար" if user["refund_method"] == "phone" else "💳 Քարտ"; operator = f"\n📞 Օպերատոր՝ <b>{escape(user.get('refund_operator') or '-')}</b>" if user.get("refund_operator") else ""; await save_state(); await notify(ADMIN_ID, f"💸 <b>Տվյալները վերադարձի համար</b>\n\n🆔 User ID՝ <code>{message.from_user.id}</code>\n📦 {escape(user.get('product') or '')}\n💰 {fmt(user.get('price') or 0)} ֏\n📌 Եղանակ՝ <b>{method}</b>{operator}\n📝 Տվյալներ՝ <code>{escape(message.text.strip())}</code>", admin_kb(message.from_user.id, user.get("receipt_accepted", False), True)); await message.answer("✅ Տվյալները ստացվեցին։ Սպասիր վերադարձի հաստատմանը."); return
+        user["refund_details_ready"] = True
+        user["refund_details"] = message.text.strip()
+        method = "📱 Հեռախոսահամար" if user["refund_method"] == "phone" else "💳 Քարտ"
+        operator = f"\n📞 Օպերատոր՝ <b>{escape(user.get('refund_operator') or '-')}</b>" if user.get("refund_operator") else ""
+        await save_state()
+        await notify(ADMIN_ID, f"💸 <b>Տվյալները վերադարձի համար</b>\n\n🆔 User ID՝ <code>{message.from_user.id}</code>\n📦 {escape(user.get('product') or '')}\n💰 {fmt(user.get('price') or 0)} ֏\n📌 Եղանակ՝ <b>{method}</b>{operator}\n📝 Տվյալներ՝ <code>{escape(message.text.strip())}</code>", admin_kb(message.from_user.id, user.get("receipt_accepted", False), True))
+        await message.answer("✅ Տվյալները ստացվեցին։ Սպասիր վերադարձի հաստատմանը.")
+        return
     if user.get("receipt_waiting_id") or (user.get("payment") in {"receipt_sent", "receipt_accepted"} and user.get("receipt_order_message_id")):
         game_id = message.text.strip()
-        if not game_id: await message.answer("⚠️ Ուղարկիր ճիշտ Game ID / Username։"); return
-        user["game_id"] = game_id; user["receipt_waiting_id"] = False; await save_state(); caption = order_summary(message.from_user.id, user, "⏳ Չեկը սպասում է ադմինի ստուգմանը։")
-        try: await bot.edit_message_caption(chat_id=ORDER_CHANNEL_ID, message_id=user["receipt_order_message_id"], caption=caption, parse_mode="HTML", reply_markup=admin_kb(message.from_user.id, user.get("receipt_accepted", False), user.get("refund_details_ready", False)))
-        except Exception: logging.exception("Could not update order with customer Game ID")
-        await message.answer("✅ <b>Game ID / Username-ը ստացվեց։</b>\n\n⏳ Վճարումը ստուգվում է, և պատվերը մշակվում է։", parse_mode="HTML"); return
+        if not game_id:
+            await message.answer("⚠️ Ուղարկիր ճիշտ Game ID / Username։")
+            return
+        user["game_id"] = game_id
+        user["receipt_waiting_id"] = False
+        await save_state()
+        caption = order_summary(message.from_user.id, user, "⏳ Չեկը սպասում է ադմինի ստուգմանը։")
+        try:
+            await bot.edit_message_caption(chat_id=ORDER_CHANNEL_ID, message_id=user["receipt_order_message_id"], caption=caption, parse_mode="HTML", reply_markup=admin_kb(message.from_user.id, user.get("receipt_accepted", False), user.get("refund_details_ready", False)))
+        except Exception:
+            logging.exception("Could not update order with customer Game ID")
+        await message.answer("✅ <b>Game ID / Username-ը ստացվեց։</b>\n\n⏳ Վճարումը ստուգվում է, և պատվերը մշակվում է։", parse_mode="HTML")
+        return
     await message.answer("ℹ️ Եթե ուզում ես ուղարկել պատվերի տվյալները, նախ ուղարկիր չեկի նկարը։", reply_markup=main_kb())
 
 
 @dp.callback_query(F.data == "buy:confirm")
 async def buy(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); await callback.message.edit_text("💳 <b>Ընտրիր վճարման եղանակը</b>\n\n" + f"📦 {escape(user['product'])}\n💰 Գումար՝ <b>{fmt(user['price'])} ֏</b>\n\nԸնտրիր՝ քարտով, թե կանխիկ։", reply_markup=payment_kb(), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    await callback.message.edit_text("💳 <b>Ընտրիր վճարման եղանակը</b>\n\n" + f"📦 {escape(user['product'])}\n💰 Գումար՝ <b>{fmt(user['price'])} ֏</b>\n\nԸնտրիր՝ քարտով, թե կանխիկ։", reply_markup=payment_kb(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "payment:card")
-async def card(callback: CallbackQuery): await callback.answer("💳 Քարտով վճարումը դեռ հասանելի չէ։", show_alert=True)
+async def card(callback: CallbackQuery):
+    await callback.answer("💳 Քարտով վճարումը դեռ հասանելի չէ։", show_alert=True)
 
 
 @dp.callback_query(F.data == "payment:cash")
 async def cash(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["payment"] = "cash"; await save_state(); await callback.message.edit_text(cash_text(user), reply_markup=receipt_kb(), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["payment"] = "cash"
+    await save_state()
+    await callback.message.edit_text(cash_text(user), reply_markup=receipt_kb(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "payment:done")
 async def payment_done(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["payment"] = "receipt_pending"; await save_state(); await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\n📸 Ուղարկիր վճարման չեկի լուսանկարը։", reply_markup=back_kb("back:payment"), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["payment"] = "receipt_pending"
+    await save_state()
+    await callback.message.edit_text("🧾 <b>Ուղարկիր չեկի նկարը</b>\n\n📸 Ուղարկիր վճարման չեկի լուսանկարը։", reply_markup=back_kb("back:payment"), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("passprice:"))
 async def passprice(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID: await callback.answer("⛔ Միայն ադմինին։", show_alert=True); return
-    _, uid_text, price_text = callback.data.split(":"); uid = int(uid_text); price = int(price_text); user = get_user(uid); user["price"] = price; user["product"] = "Brawl Pass" if user["brawl_pass_type"] == "brawl_pass" else "Brawl Pass+"; user["brawl_pass_type"] = None
-    try: await callback.message.edit_caption((callback.message.caption or "") + f"\n\n✅ <b>Ընտրված գին՝ {fmt(price)} ֏</b>", parse_mode="HTML", reply_markup=None)
-    except Exception: logging.exception("Could not update Brawl Pass admin message")
-    await save_state(); await notify(uid, "✅ <b>Ձեր Pass-ի գինը հաստատվեց։</b>\n\n" + f"📦 {escape(user['product'])}\n💰 {fmt(user['price'])} ֏\n\nՇարունակե՞լ պատվերը։", product_kb("brawlstars")); await callback.answer("✅ Գինը ընտրված է։")
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Միայն ադմինին։", show_alert=True)
+        return
+    _, uid_text, price_text = callback.data.split(":")
+    uid = int(uid_text)
+    price = int(price_text)
+    user = get_user(uid)
+    user["price"] = price
+    user["product"] = "Brawl Pass" if user["brawl_pass_type"] == "brawl_pass" else "Brawl Pass+"
+    user["brawl_pass_type"] = None
+    try:
+        await callback.message.edit_caption((callback.message.caption or "") + f"\n\n✅ <b>Ընտրված գին՝ {fmt(price)} ֏</b>", parse_mode="HTML", reply_markup=None)
+    except Exception:
+        logging.exception("Could not update Brawl Pass admin message")
+    await save_state()
+    await notify(uid, "✅ <b>Ձեր Pass-ի գինը հաստատվեց։</b>\n\n" + f"📦 {escape(user['product'])}\n💰 {fmt(user['price'])} ֏\n\nՇարունակե՞լ պատվերը։", product_kb("brawlstars"))
+    await callback.answer("✅ Գինը ընտրված է։")
 
 
 async def admin_only(callback):
     if callback.from_user.id != ADMIN_ID:
-        await callback.answer("⛔ Այս կոճակը հասանելի է միայն ադմինին։", show_alert=True); return False
+        await callback.answer("⛔ Այս կոճակը հասանելի է միայն ադմինին։", show_alert=True)
+        return False
     return True
 
 
 @dp.callback_query(F.data.startswith("receipt:"))
 async def receipt(callback: CallbackQuery):
-    if not await admin_only(callback): return
-    _, action, uid_text = callback.data.split(":"); uid = int(uid_text); user = get_user(uid)
+    if not await admin_only(callback):
+        return
+    _, action, uid_text = callback.data.split(":")
+    uid = int(uid_text)
+    user = get_user(uid)
     if action == "reject":
-        await finalize(uid, "❌ Չեկը մերժված է — Դոնաթը չի հաջողվել.", "❌ <b>Դոնաթը չի հաջողվել.</b>\n\nՎճարման չեկը մերժվել է։ Եթե կարծում ես, որ սխալ է, կապվիր աջակցությանը."); await callback.answer("❌ Չեկը մերժվեց։"); return
+        await finalize(uid, "❌ Չեկը մերժված է — Դոնաթը չի հաջողվել.", "❌ <b>Դոնաթը չի հաջողվել.</b>\n\nՎճարման չեկը մերժվել է։ Եթե կարծում ես, որ սխալ է, կապվիր աջակցությանը.")
+        await callback.answer("❌ Չեկը մերժվեց։")
+        return
     if action == "accept":
-        user["receipt_accepted"] = True; user["payment"] = "receipt_accepted"; user["receipt_order_message_id"] = callback.message.message_id; await save_state()
-        await callback.message.edit_caption(caption=order_summary(uid, user, "✅ Չեկը հաստատված է։"), parse_mode="HTML", reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False)))
-        await notify(uid, "✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է."); await callback.answer("✅ Չեկը հաստատվեց։"); return
+        user["receipt_accepted"] = True
+        user["payment"] = "receipt_accepted"
+        user["receipt_order_message_id"] = callback.message.message_id
+        await save_state()
+        await callback.message.edit_caption(caption=order_summary(uid, user, "✅ Չեկը հաստատված է։ Ընտրիր հաջորդ գործողությունը."), parse_mode="HTML", reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False)))
+        await notify(uid, "✅ <b>Չեկը հաստատվեց։</b>\n\n⏳ Պատվերը պատրաստվում է.")
+        await callback.answer("✅ Չեկը հաստատվեց։")
+        return
     if action == "confirm":
-        if not user.get("receipt_accepted"): await callback.answer("⚠️ Նախ հաստատիր չեկը։", show_alert=True); return
-        await finalize(uid, "📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.", "🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎"); await callback.answer("📦 Պատվերը ավարտվեց։"); return
+        if not user.get("receipt_accepted"):
+            await callback.answer("⚠️ Նախ հաստատիր չեկը։", show_alert=True)
+            return
+        await finalize(uid, "📦 Պատվերը հաստատված է — Դոնաթը հաջողությամբ ավարտված է.", "🎉 <b>Դոնաթը հաջողությամբ ավարտված է։</b> ❤️‍🔥\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։ 💎")
+        await callback.answer("📦 Պատվերը ավարտվեց։")
+        return
     if action == "refund":
-        user["refund_waiting"] = True; user["refund_method"] = None; user["refund_operator"] = None; user["refund_details_ready"] = False; await save_state(); await notify(uid, "⚠️ <b>Դոնաթը չի հաջողվել։</b>\n\n💸 Ընտրիր, թե որտեղ պետք է կատարվի վերադարձը։", refund_method_kb()); await callback.answer("💸 Հաճախորդին ուղարկվեց վերադարձի ընտրությունը."); return
+        user["refund_waiting"] = True
+        user["refund_method"] = None
+        user["refund_operator"] = None
+        user["refund_details_ready"] = False
+        await save_state()
+        await notify(uid, "⚠️ <b>Դոնաթը չի հաջողվել։</b>\n\n💸 Ընտրիր, թե որտեղ պետք է կատարվի վերադարձը։", refund_method_kb())
+        await callback.answer("💸 Հաճախորդին ուղարկվեց վերադարձի ընտրությունը.")
+        return
     if action == "refund_complete":
-        if not user.get("refund_details_ready"): await callback.answer("⚠️ Հաճախորդը դեռ չի տրամադրել տվյալները.", show_alert=True); return
-        await finalize(uid, "💸 Հետ գումարի վերադարձը ավարտված է — Դոնաթը չի հաջողվել.", "💸 <b>Հետ գումարի վերադարձը ավարտված է։</b>\n\n❌ Դոնաթը չի հաջողվել։ Գումարը վերադարձվել է."); await callback.answer("✅ Վերադարձը ավարտվեց."); return
+        if not user.get("refund_details_ready"):
+            await callback.answer("⚠️ Հաճախորդը դեռ չի տրամադրել տվյալները.", show_alert=True)
+            return
+        await finalize(uid, "💸 Հետ գումարի վերադարձը ավարտված է — Դոնաթը չի հաջողվել.", "💸 <b>Հետ գումարի վերադարձը ավարտված է։</b>\n\n❌ Դոնաթը չի հաջողվել։ Գումարը վերադարձվել է.")
+        await callback.answer("✅ Վերադարձը ավարտվեց.")
+        return
 
 
 @dp.callback_query(F.data.startswith("verify_menu:"))
 async def verify_menu(callback: CallbackQuery):
-    if not await admin_only(callback): return
-    uid = int(callback.data.split(":")[1]); user = get_user(uid)
-    if not user.get("receipt_accepted"): await callback.answer("⚠️ Նախ հաստատիր չեկը.", show_alert=True); return
-    if user.get("game") != "roblox": await callback.answer("ℹ️ 2FA ընտրությունը հասանելի է Roblox-ի համար.", show_alert=True); return
-    await callback.message.edit_caption(caption=order_summary(uid, user, "🔐 Ընտրիր հաճախորդի համար անհրաժեշտ 2FA տարբերակը."), parse_mode="HTML", reply_markup=admin_verify_kb(uid)); await callback.answer()
+    if not await admin_only(callback):
+        return
+    uid = int(callback.data.split(":")[1])
+    user = get_user(uid)
+    if not user.get("receipt_accepted"):
+        await callback.answer("⚠️ Նախ հաստատիր չեկը.", show_alert=True)
+        return
+    await callback.message.edit_caption(caption=order_summary(uid, user, "🔐 Ընտրիր 2FA տարբերակը для клиента."), parse_mode="HTML", reply_markup=admin_verify_kb(uid))
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("verify_back:"))
 async def verify_back(callback: CallbackQuery):
-    if not await admin_only(callback): return
-    uid = int(callback.data.split(":")[1]); user = get_user(uid); await callback.message.edit_caption(caption=order_summary(uid, user, "✅ Չեկը հաստատված է."), parse_mode="HTML", reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False))); await callback.answer()
+    if not await admin_only(callback):
+        return
+    uid = int(callback.data.split(":")[1])
+    user = get_user(uid)
+    await callback.message.edit_caption(caption=order_summary(uid, user, "✅ Չեկը հաստատված է."), parse_mode="HTML", reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False)))
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("verify:"))
 async def verify(callback: CallbackQuery):
-    if not await admin_only(callback): return
-    _, uid_text, kind = callback.data.split(":"); uid = int(uid_text)
-    if kind not in VERIFY_IMAGES: await callback.answer("❌ Սխալ ստուգման տեսակ.", show_alert=True); return
+    if not await admin_only(callback):
+        return
+    _, uid_text, kind = callback.data.split(":")
+    uid = int(uid_text)
+    if kind not in VERIFY_IMAGES:
+        await callback.answer("❌ Սխալ ստուգման տեսակ.", show_alert=True)
+        return
     user = get_user(uid)
-    if not user.get("receipt_accepted"): await callback.answer("⚠️ Նախ հաստատիր չեկը.", show_alert=True); return
-    user["verification_type"] = kind; await save_state()
+    if not user.get("receipt_accepted"):
+        await callback.answer("⚠️ Նախ հաստատիր չեկը.", show_alert=True)
+        return
+    user["verification_type"] = kind
+    await save_state()
     await callback.message.edit_caption(caption=order_summary(uid, user, f"🔐 Ընտրված է՝ {verification_caption(kind)}"), parse_mode="HTML", reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False)))
-    await send_verification_instruction(uid, kind); await callback.answer("✅ Հաճախորդին ուղարկվեց ուղեցույցը.")
+    await send_verification_instruction(uid, kind)
+    await callback.answer("✅ Հաճախորդին ուղարկվեց ուղեցույցը.")
 
 
 @dp.callback_query(F.data == "refundclient:phone")
 async def refund_phone(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["refund_method"] = "phone"; await save_state(); await callback.message.edit_text("📱 <b>Ընտրիր քո բջջային օպերատորը</b>։", reply_markup=operators_kb(), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["refund_method"] = "phone"
+    await save_state()
+    await callback.message.edit_text("📱 <b>Ընտրիր քո բջջային օպերատորը</b>։", reply_markup=operators_kb(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "refundclient:card")
 async def refund_card(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["refund_method"] = "card"; user["refund_operator"] = None; await save_state(); await callback.message.edit_text("💳 <b>Ուղարկիր քարտի համարը</b>։\n\n⚠️ Մի ուղարկիր CVV/CVC, PIN կամ այլ գաղտնի կոդ։", reply_markup=back_kb("refundclient:back"), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["refund_method"] = "card"
+    user["refund_operator"] = None
+    await save_state()
+    await callback.message.edit_text("💳 <b>Ուղարկիր քարտի համարը</b>։\n\n⚠️ Մի ուղարկիր CVV/CVC, PIN կամ այլ գաղտնի կոդ։", reply_markup=back_kb("refundclient:back"), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("refundclient:operator:"))
 async def refund_operator(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); operator = callback.data.split(":", 2)[2]; user["refund_operator"] = operator; await save_state(); await callback.message.edit_text(f"📱 <b>{escape(operator)}</b>\n\nՈւղարկիր հեռախոսահամարը, որին պետք է կատարվի վերադարձը։\n\n⚠️ <b>Զգուշացում․</b> եթե վերադարձը կատարվում է հեռախոսահամարին, տվյալ գումարը կարող է օգտագործվել զանգերի/կապի համար և կարող է ավելանալ քո խոսակցության հաշվին։", reply_markup=back_kb("refundclient:back"), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    operator = callback.data.split(":", 2)[2]
+    user["refund_operator"] = operator
+    await save_state()
+    await callback.message.edit_text(f"📱 <b>{escape(operator)}</b>\n\nՈւղարկիր հեռախոսահամարը, որին պետք է կատարվի վերադարձը։\n\n⚠️ <b>Զգուշացում․</b> եթե վերադարձը կատարվում է հեռախոսահամարին, տվյալ գումարը կարող է օգտագործվել զանգերի/կապի համար և կարող է ավելանալ քո խոսակցության հաշվին։", reply_markup=back_kb("refundclient:back"), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "refundclient:back")
 async def refund_back(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["refund_method"] = None; user["refund_operator"] = None; user["refund_details_ready"] = False; await save_state(); await callback.message.edit_text("💸 <b>Ընտրիր վերադարձի եղանակը</b>։", reply_markup=refund_method_kb(), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["refund_method"] = None
+    user["refund_operator"] = None
+    user["refund_details_ready"] = False
+    await save_state()
+    await callback.message.edit_text("💸 <b>Ընտրիր վերադարձի եղանակը</b>։", reply_markup=refund_method_kb(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "contact:open")
 async def contact(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["support_waiting"] = True; await save_state(); await callback.message.edit_text("📩 <b>Կապվեք մեզ հետ</b>\n\n💬 Գրիր քո հաղորդագրությունը, և մենք կստանանք այն։", reply_markup=back_kb("back:main"), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["support_waiting"] = True
+    await save_state()
+    await callback.message.edit_text("📩 <b>Կապվեք մեզ հետ</b>\n\n💬 Գրիր քո հաղորդագրությունը, և մենք կստանանք այն։", reply_markup=back_kb("back:main"), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "back:main")
 async def back_main(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); user["support_waiting"] = False; await save_state(); await callback.message.edit_text(main_text(), reply_markup=main_kb(), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    user["support_waiting"] = False
+    await save_state()
+    await callback.message.edit_text(main_text(), reply_markup=main_kb(), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("back:game:"))
 async def back_game(callback: CallbackQuery):
     game = callback.data.split(":", 2)[2]
-    if game not in CATALOG: await callback.answer("❌ Սխալ խաղ.", show_alert=True); return
-    user = get_user(callback.from_user.id); user["brawl_pass_waiting"] = False; await save_state(); await callback.message.edit_text(f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։", reply_markup=game_kb(game), parse_mode="HTML"); await callback.answer()
+    if game not in CATALOG:
+        await callback.answer("❌ Սխալ խաղ.", show_alert=True)
+        return
+    user = get_user(callback.from_user.id)
+    user["brawl_pass_waiting"] = False
+    await save_state()
+    await callback.message.edit_text(f"{CATALOG[game]['name']}\n\n📦 Ընտրիր անհրաժեշտ ապրանքը։", reply_markup=game_kb(game), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "back:product")
 async def back_product(callback: CallbackQuery):
-    user = get_user(callback.from_user.id); await callback.message.edit_text("🛒 <b>Ձեր ընտրությունը</b>\n\n" + f"📦 {escape(user.get('product') or '')}\n💰 {fmt(user.get('price') or 0)} ֏", reply_markup=product_kb(user["game"]), parse_mode="HTML"); await callback.answer()
+    user = get_user(callback.from_user.id)
+    await callback.message.edit_text("🛒 <b>Ձեր ընտրությունը</b>\n\n" + f"📦 {escape(user.get('product') or '')}\n💰 {fmt(user.get('price') or 0)} ֏", reply_markup=product_kb(user["game"]), parse_mode="HTML")
+    await callback.answer()
 
 
 @dp.callback_query(F.data == "back:payment")
-async def back_payment(callback: CallbackQuery): await buy(callback)
+async def back_payment(callback: CallbackQuery):
+    await buy(callback)
 
 
 async def health(request):
@@ -450,8 +617,12 @@ async def health(request):
 
 async def main():
     load_state()
-    app = web.Application(); app.router.add_get("/", health); app.router.add_get("/health", health)
-    runner = web.AppRunner(app); await runner.setup(); await web.TCPSite(runner, "0.0.0.0", PORT).start()
+    app = web.Application()
+    app.router.add_get("/", health)
+    app.router.add_get("/health", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", PORT).start()
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
