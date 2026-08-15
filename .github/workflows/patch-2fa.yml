@@ -1,0 +1,160 @@
+name: Apply Roblox 2FA update
+on:
+  push:
+    paths:
+      - .github/workflows/patch-2fa.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch bot
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('gamesvaultshop.py')
+          s = p.read_text(encoding='utf-8')
+          images = '''VERIFY_IMAGES = {
+              "email": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/4/2/6/8/4268f5cf79d76d381d13648d545b8929d562ae08.png",
+              "authenticator": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/e/5/8/9/e589e6689b123cc013b4f4370afa5f15a0b6b0dd.png",
+              "device": "https://devforum-uploads.s3.dualstack.us-east-2.amazonaws.com/uploads/original/5X/a/4/c/b/a4cb7f66e45935445932f8d966013463406a251e.png",
+          }'''
+          s, n = re.subn(r'VERIFY_IMAGES = \{.*?\n\}\n\n\ndef blank_user', images + '\n\n\ndef blank_user', s, count=1, flags=re.S)
+          assert n == 1
+          old = '''def admin_kb(uid, accepted=False, refund_ready=False):
+              user = get_user(uid)
+              rows = [[InlineKeyboardButton(text="❌ Մերժել չեկը", callback_data=f"receipt:reject:{uid}"), InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}")], [InlineKeyboardButton(text="💸 Տրամադրել հետ գումարը", callback_data=f"receipt:refund:{uid}")]]
+              if accepted:
+                  rows.append([InlineKeyboardButton(text="🔐 2FA", callback_data=f"verify_menu:{uid}")])
+              if accepted:
+                  rows.append([InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"receipt:confirm:{uid}")])
+              if refund_ready:
+                  rows.append([InlineKeyboardButton(text="✅ Հետ գումարի վերադարձը ավարտված է", callback_data=f"receipt:refund_complete:{uid}")])
+              return InlineKeyboardMarkup(inline_keyboard=rows)
+'''
+          new = '''def admin_kb(uid, accepted=False, refund_ready=False):
+              user = get_user(uid)
+              rows = [[InlineKeyboardButton(text="❌ Մերժել չեկը", callback_data=f"receipt:reject:{uid}"), InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}")], [InlineKeyboardButton(text="💸 Տրամադրել հետ գումարը", callback_data=f"receipt:refund:{uid}")]]
+              if accepted:
+                  if user.get("verification_done"):
+                      rows.append([InlineKeyboardButton(text="🔓 2FA հաստատված է", callback_data=f"verify_menu:{uid}")])
+                  else:
+                      rows.append([InlineKeyboardButton(text="🔐 2FA", callback_data=f"verify_menu:{uid}")])
+                  rows.append([InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"receipt:confirm:{uid}")])
+              if refund_ready:
+                  rows.append([InlineKeyboardButton(text="✅ Հետ գումարի վերադարձը ավարտված է", callback_data=f"receipt:refund_complete:{uid}")])
+              return InlineKeyboardMarkup(inline_keyboard=rows)
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          old = '''def admin_verify_kb(uid):
+              return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📧 E-mail", callback_data=f"verify:{uid}:email")], [InlineKeyboardButton(text="🔐 Authenticator", callback_data=f"verify:{uid}:authenticator")], [InlineKeyboardButton(text="📱 Այլ սարքով հաստատում", callback_data=f"verify:{uid}:device")], [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify_back:{uid}")]])
+'''
+          new = '''def admin_verify_kb(uid):
+              return InlineKeyboardMarkup(inline_keyboard=[
+                  [InlineKeyboardButton(text="📧 E-mail", callback_data=f"verify:{uid}:email")],
+                  [InlineKeyboardButton(text="🔐 Authenticator", callback_data=f"verify:{uid}:authenticator")],
+                  [InlineKeyboardButton(text="📱 Հաստատում այլ սարքով", callback_data=f"verify:{uid}:device")],
+                  [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify_back:{uid}")],
+              ])
+'''
+          assert old in s
+          s = s.replace(old, new, 1)
+          start = s.index('def verification_text(kind):')
+          end = s.index('\n\ndef verification_caption(kind):', start)
+          new = '''def verification_text(kind):
+              if kind == "email":
+                  return (
+                      "📧 <b>Roblox — E-mail հաստատում</b>\n\n"
+                      "1️⃣ Բացիր Roblox-ի քո մուտքի էջը։\n"
+                      "2️⃣ Roblox-ի ուղարկած E-mail կոդը <b>մուտքագրիր միայն Roblox-ի պաշտոնական էջում</b>։\n"
+                      "3️⃣ Վերադարձիր Roblox և ստուգիր, որ մուտքը հաջողվել է։\n\n"
+                      "⚠️ <b>Կոդը երբեք մի ուղարկիր Games Vault Shop-ին կամ ադմինին։</b>"
+                  )
+              if kind == "authenticator":
+                  return (
+                      "🔐 <b>Roblox — Authenticator</b>\n\n"
+                      "1️⃣ Բացիր քո Authenticator հավելվածը։\n"
+                      "2️⃣ Գտիր Roblox-ի ընթացիկ 6-նիշ կոդը։\n"
+                      "3️⃣ Կոդը <b>մուտքագրիր միայն Roblox-ի պաշտոնական մուտքի էջում</b>։\n\n"
+                      "⚠️ <b>Authenticator-ի կոդը երբեք մի ուղարկիր Games Vault Shop-ին կամ ադմինին։</b>"
+                  )
+              return (
+                  "📱 <b>Roblox — հաստատում այլ սարքով</b>\n\n"
+                  "1️⃣ Վերցրու այն հեռախոսը կամ պլանշետը, որտեղ Roblox-ի քո հաշիվը արդեն մուտք գործած է։\n"
+                  "2️⃣ Բացիր Roblox հավելվածը։\n"
+                  "3️⃣ Գտիր նոր մուտքի հարցումը և հաստատիր այն միայն այն դեպքում, եթե հենց դու ես սկսել մուտքը։\n\n"
+                  "⚠️ Եթե հարցումը քոնը չէ՝ մերժիր այն։\n"
+                  "⚠️ <b>Games Vault Shop-ը երբեք չի խնդրում գաղտնաբառ, OTP կամ 2FA կոդ։</b>"
+              )
+'''
+          s = s[:start] + new + s[end:]
+          start = s.index('async def send_verification_instruction(uid, kind):')
+          end = s.index('\n\n@dp.message(CommandStart())', start)
+          new = '''async def send_verification_instruction(uid, kind):
+              user = get_user(uid)
+              user["verification_type"] = kind
+              user["verification_done"] = False
+              await save_state()
+              text = verification_text(kind)
+              image = VERIFY_IMAGES.get(kind)
+              markup = InlineKeyboardMarkup(inline_keyboard=[
+                  [InlineKeyboardButton(text="✅ Մուտքը հաստատված է", callback_data="verify_client_done")]
+              ])
+              try:
+                  if image:
+                      await bot.send_photo(uid, image, caption=text, parse_mode="HTML", reply_markup=markup)
+                  else:
+                      await bot.send_message(uid, text, parse_mode="HTML", reply_markup=markup)
+              except Exception:
+                  logging.exception("verification image/message failed")
+                  await notify(uid, text, markup)
+'''
+          s = s[:start] + new + s[end:]
+          marker = '@dp.callback_query(F.data.startswith("refundclient:operator:"))'
+          insert_at = s.index(marker)
+          new_handler = '''@dp.callback_query(F.data == "verify_client_done")
+          async def verify_client_done(callback: CallbackQuery):
+              uid = callback.from_user.id
+              user = get_user(uid)
+              if not user.get("verification_type"):
+                  await callback.answer("⚠️ Նախ սպասիր ադմինի ուղարկած հրահանգին։", show_alert=True)
+                  return
+              user["verification_done"] = True
+              await save_state()
+              if ORDER_CHANNEL_ID and user.get("receipt_order_message_id"):
+                  try:
+                      await bot.edit_message_caption(
+                          chat_id=ORDER_CHANNEL_ID,
+                          message_id=user["receipt_order_message_id"],
+                          caption=order_summary(uid, user, "🔓 2FA հաստատված է հաճախորդի կողմից։ Կարող եք շարունակել պատվերը։"),
+                          parse_mode="HTML",
+                          reply_markup=admin_kb(uid, True, user.get("refund_details_ready", False)),
+                      )
+                  except Exception:
+                      logging.exception("Could not update order after client 2FA confirmation")
+              await callback.message.edit_reply_markup(reply_markup=None)
+              await notify(uid, "✅ <b>Մուտքի հաստատումը նշվեց որպես ավարտված։</b>\n\n⏳ Սպասիր, մինչև ադմինը ավարտի պատվերը։", None)
+              try:
+                  await bot.send_message(ADMIN_ID, f"🔓 <b>Հաճախորդը հաստատեց Roblox մուտքը։</b>\n\n🆔 ID՝ <code>{uid}</code>\n📦 {escape(user.get('product') or 'չկա')}\n💰 {fmt(user.get('price') or 0)} ֏")
+              except Exception:
+                  logging.exception("Could not notify admin about 2FA completion")
+              await callback.answer("✅ Մուտքը հաստատված է։")
+
+
+          '''
+          s = s[:insert_at] + new_handler + s[insert_at:]
+          p.write_text(s, encoding='utf-8')
+          compile(s, 'gamesvaultshop.py', 'exec')
+          print('gamesvaultshop.py patched and compiled successfully')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gamesvaultshop.py
+          git rm .github/workflows/patch-2fa.yml
+          git commit -m "Fix Roblox 2FA flow with Armenian instructions and images"
+          git push
