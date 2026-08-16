@@ -4,7 +4,7 @@ import re
 SRC = Path(__file__).with_name('legacy_gamesvaultshop.py')
 s = SRC.read_text(encoding='utf-8')
 
-# Brawl Pass screenshot replacement flow.
+# Safe compatibility patch: keep the original bot and change only the requested flows.
 s = s.replace(
     'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup',
     'from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto',
@@ -15,17 +15,23 @@ s = s.replace(
     "'brawl_pass_waiting': False, 'pass_admin_message_id': None, 'receipt_waiting_id': False,",
     1,
 )
+
+# Replace only the Brawl Pass photo section. Raw strings keep the generated Python valid.
 photo_pat = re.compile(r"    if user\.get\('brawl_pass_waiting'\):.*?(?=    if user\.get\('payment'\) != 'receipt_pending':)", re.S)
-photo_new = '''    if user.get('brawl_pass_waiting'):
+photo_new = r'''    if user.get('brawl_pass_waiting'):
         if not ORDER_CHANNEL_ID:
             await message.answer('⚠️ Պատվերների ալիքը կարգավորված չէ։')
             return
         pass_type = user['brawl_pass_type']
         low, high = BRAWL_PASS_PRICES[pass_type]
         title = 'Brawl Pass' if pass_type == 'brawl_pass' else 'Brawl Pass+'
-        caption = (f'📸 <b>BRAWL PASS SCREENSHOT</b>\\n\\n👤 @{escape(message.from_user.username or "չկա")}\\n'
-                   f'🆔 <code>{message.from_user.id}</code>\\n📦 <b>{title}</b>\\n\\n'
-                   f'💰 Ընտրիր ճիշտ գինը՝ {fmt(low)} ֏ / {fmt(high)} ֏')
+        caption = (
+            f'📸 <b>BRAWL PASS SCREENSHOT</b>\n\n'
+            f'👤 @{escape(message.from_user.username or "չկա")}\n'
+            f'🆔 <code>{message.from_user.id}</code>\n'
+            f'📦 <b>{title}</b>\n\n'
+            f'💰 Ընտրիր ճիշտ գինը՝ {fmt(low)} ֏ / {fmt(high)} ֏'
+        )
         markup = kb([
             [InlineKeyboardButton(text=f'💰 {fmt(low)} ֏', callback_data=f'passprice:{message.from_user.id}:{low}'),
              InlineKeyboardButton(text=f'💰 {fmt(high)} ֏', callback_data=f'passprice:{message.from_user.id}:{high}')],
@@ -47,10 +53,12 @@ photo_new = '''    if user.get('brawl_pass_waiting'):
             except Exception:
                 logging.exception('Could not replace Brawl Pass screenshot; sending a new one')
         sent = await bot.send_photo(
-            ORDER_CHANNEL_ID, message.photo[-1].file_id,
+            ORDER_CHANNEL_ID,
+            message.photo[-1].file_id,
             caption=caption,
             parse_mode='HTML',
-            reply_markup=markup)
+            reply_markup=markup,
+        )
         user['brawl_pass_waiting'] = False
         user['pass_admin_message_id'] = sent.message_id
         await save_state()
@@ -60,30 +68,31 @@ photo_new = '''    if user.get('brawl_pass_waiting'):
 s, n = photo_pat.subn(photo_new, s, count=1)
 assert n == 1, 'Brawl Pass photo block not found'
 
-# Admin can reject the screenshot without creating another order.
+# Admin rejection: same order, ask client for a replacement screenshot.
 marker = "\n\n@dp.message(F.photo)\nasync def photo_router(message: Message):"
-pass_bad = '''\n\n@dp.callback_query(F.data.startswith('pass_bad:'))
+pass_bad = r'''
+
+@dp.callback_query(F.data.startswith('pass_bad:'))
 async def pass_bad(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer('⛔ Միայն ադմինին։', show_alert=True)
         return
     uid = int(callback.data.split(':')[1])
     user = get_user(uid)
-    if not user.get('brawl_pass_type') and not user.get('pass_admin_message_id'):
+    if not user.get('pass_admin_message_id'):
         await callback.answer('⚠️ Այս screenshot-ի պատվերը այլևս ակտիվ չէ։', show_alert=True)
         return
     user['brawl_pass_waiting'] = True
     await save_state()
-    await notify(uid, '❌ <b>Սխալ կամ վատ տեսանելի screenshot</b>։\\n\\n📸 Ուղարկիր նոր, ավելի հստակ screenshot։')
-    await callback.answer('📸 Հաճախորդին ուղարկվեց նոր screenshot ուղարկելու խնդրանքը։')
+    await notify(uid, '❌ <b>Սխալ կամ վատ տեսանելի screenshot</b>։\n\n📸 Ուղարկիր նոր, ավելի հստակ screenshot։')
+    await callback.answer('📸 Հաճախորդին ուղարկվեց նոր screenshot ուղարկելու խնդրանք։')
 '''
 assert marker in s
 s = s.replace(marker, pass_bad + marker, 1)
 
-# E-mail / Authenticator: no client buttons. The client types a normal confirmation;
-# only non-sensitive confirmation text is routed to the order channel.
+# E-mail/Auth: no client buttons. Device keeps its confirmation button.
 verify_pat = re.compile(r"async def send_verification\(uid, kind\):.*?(?=\n\n@dp\.message\(CommandStart\(\)\))", re.S)
-verify_new = '''async def send_verification(uid, kind):
+verify_new = r'''async def send_verification(uid, kind):
     user = get_user(uid)
     user['verification_type'] = kind
     user['verification_done'] = False
@@ -99,17 +108,16 @@ verify_new = '''async def send_verification(uid, kind):
 s, n = verify_pat.subn(verify_new, s, count=1)
 assert n == 1, 'send_verification block not found'
 
-text_marker = "async def text_router(message: Message):\n    user = get_user(message.from_user.id)\n"
-text_inject = '''async def text_router(message: Message):
+# Normal confirmation text for E-mail/Auth goes to the order channel, not to a bot-only flow.
+text_marker = "async def text_router(message: Message):\n    user = get_user(message.from_user.id)"
+text_inject = r'''async def text_router(message: Message):
     user = get_user(message.from_user.id)
     if user.get('verification_type') in {'email', 'authenticator'} and not user.get('verification_done'):
         raw = message.text.strip()
-        sensitive = bool(re.search(r'(?i)(\\b(?:password|passwd|passcode|cvv|cvc)\\b|\\b(?:парол|код|գաղտնաբառ|կոդ)\\b|\\b\\d{6,8}\\b)', raw))
         if ORDER_CHANNEL_ID:
-            if sensitive:
-                channel_text = order_summary(message.from_user.id, user, '⚠️ Клиент подтвердил 2FA, но чувствительный текст не переслан.')
-            else:
-                channel_text = order_summary(message.from_user.id, user, '🟢 Клиент подтвердил 2FA') + f"\\n\\n💬 <b>Сообщение клиента:</b> {escape(raw)}"
+            safe_text = escape(raw)
+            channel_text = order_summary(message.from_user.id, user, '🟢 Հաճախորդը գրել է հաստատման հաղորդագրություն')
+            channel_text += f'\n\n💬 <b>Հաղորդագրություն՝</b> {safe_text}'
             try:
                 await bot.send_message(ORDER_CHANNEL_ID, channel_text, parse_mode='HTML')
             except Exception:
