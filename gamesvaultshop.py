@@ -16,7 +16,8 @@ s = s.replace(
     1,
 )
 
-# Replace only the Brawl Pass photo section. Raw strings keep the generated Python valid.
+# Replace only the Brawl Pass photo section. Use a callable replacement so backslash-n stays
+# inside the generated Python string literal instead of becoming a physical newline.
 photo_pat = re.compile(r"    if user\.get\('brawl_pass_waiting'\):.*?(?=    if user\.get\('payment'\) != 'receipt_pending':)", re.S)
 photo_new = r'''    if user.get('brawl_pass_waiting'):
         if not ORDER_CHANNEL_ID:
@@ -65,7 +66,7 @@ photo_new = r'''    if user.get('brawl_pass_waiting'):
         await message.answer('✅ Screenshot-ը ստացվեց։ Ադմինը կընտրի ճիշտ գինը։', reply_markup=main_kb())
         return
 '''
-s, n = photo_pat.subn(photo_new, s, count=1)
+s, n = photo_pat.subn(lambda m: photo_new, s, count=1)
 assert n == 1, 'Brawl Pass photo block not found'
 
 # Admin rejection: same order, ask client for a replacement screenshot.
@@ -105,7 +106,7 @@ verify_new = r'''async def send_verification(uid, kind):
         logging.exception('verification image failed')
         await notify(uid, text, markup)
 '''
-s, n = verify_pat.subn(verify_new, s, count=1)
+s, n = verify_pat.subn(lambda m: verify_new, s, count=1)
 assert n == 1, 'send_verification block not found'
 
 # Normal confirmation text for E-mail/Auth goes to the order channel, not to a bot-only flow.
