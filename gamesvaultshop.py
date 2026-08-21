@@ -300,7 +300,7 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
             await bot.edit_message_media(
                 chat_id=u["order_chat_id"],
                 message_id=u["order_message_id"],
-                media=InputMediaPhoto(media=file_id, caption=order_caption(uid), parse_mode="HTML"),
+                media=InputMediaPhoto(media=file_id, caption=order_caption(uid), ),
                 reply_markup=markup
             )
         else:
@@ -680,7 +680,7 @@ async def text_input(message: Message):
             await bot.send_message(
                 int(SUPPORT_CHANNEL_ID),
                 f"📩 Support\n👤 {uid}\n@{escape(message.from_user.username or 'չկա')}\n\n{escape(text)}",
-                parse_mode="HTML"
+                
             )
         u["support_waiting"] = False
         await save_state()
@@ -1151,7 +1151,7 @@ async def verify_retry(c: CallbackQuery):
 @dp.message(Command("admin"))
 async def admin_cmd(message: Message):
     if message.from_user.id == ADMIN_ID:
-        await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։", parse_mode="HTML")
+        await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։", )
 
 async def health_handler(request):
     return web.Response(text="OK")
