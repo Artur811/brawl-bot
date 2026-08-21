@@ -175,7 +175,7 @@ def is_brawl_pass(product):
 def get_game_emoji(game):
     return GAME_EMOJIS.get(game, "🎮")
 
-# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ
+# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="🎮 Roblox", callback_data="game:roblox"), 
@@ -183,8 +183,7 @@ def main_kb():
         [InlineKeyboardButton(text="⭐ Brawl Stars", callback_data="game:brawlstars"), 
          InlineKeyboardButton(text="🪂 PUBG Mobile", callback_data="game:pubg")],
         [InlineKeyboardButton(text="⚽ FC Mobile", callback_data="game:fcmobile")],
-        [InlineKeyboardButton(text="📩 Կապվեք մեզ հետ", callback_data="contact:open"),
-         InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")]
+        [InlineKeyboardButton(text="📩 Կապվեք մեզ հետ", callback_data="contact:open")]
     ])
 
 def game_kb(game):
@@ -199,33 +198,28 @@ def game_kb(game):
             text = f"⚡ {name} — {fmt(price)} ֏"
         rows.append([InlineKeyboardButton(text=text, callback_data=f"product:{game}:{i}")])
     rows.append([InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")])
-    rows.append([InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")])
     return kb(rows)
 
 def product_kb(game):
     return kb([
         [InlineKeyboardButton(text="✅ Գնել", callback_data="buy:confirm")],
-        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"back:game:{game}")],
-        [InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")]
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"back:game:{game}")]
     ])
 
 def payment_kb():
     return kb([
         [InlineKeyboardButton(text="💵 Telcell", callback_data="payment:telcell")],
-        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:product")],
-        [InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")]
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:product")]
     ])
 
 def back_payment_kb(): 
     return kb([
-        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")],
-        [InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")]
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:payment")]
     ])
 
 def back_main_kb(): 
     return kb([
-        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")],
-        [InlineKeyboardButton(text="❌ Չեղարկել", callback_data="cancel:order")]
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]
     ])
 
 def admin_bp_kb(uid, product_name):
@@ -336,10 +330,8 @@ async def send_client_photo(uid, photo_path, caption, markup=None):
         await send_client(uid, caption, markup)
 
 async def notify_admin(text, markup=None):
-    try:
-        await bot.send_message(ADMIN_ID, text, reply_markup=markup)
-    except Exception:
-        logger.exception("Admin notification failed")
+    # ⭐ FUNKTSIAN ERKARAREL E, BAJC HIMA CHENQ OGTAGORCUM
+    pass
 
 async def update_admin_order(uid, markup=None):
     u = get_user(uid)
@@ -444,7 +436,6 @@ async def start(message: Message):
         "💎 <b>Games Vault Shop</b>\n\nԸնտրիր խաղը և ստացիր քո թվային ապրանքը արագ ու անվտանգ։",
         reply_markup=main_kb()
     )
-    await notify_admin(f"👤 Նոր օգտատեր՝ @{message.from_user.username} (ID: {uid})")
 
 @dp.message(Command("cancel"))
 async def cancel_command(message: Message):
@@ -458,20 +449,6 @@ async def cancel_command(message: Message):
     u["username"] = message.from_user.username
     await save_state()
     await message.answer("❌ Պատվերը չեղարկվեց։", reply_markup=main_kb())
-
-@dp.callback_query(F.data == "cancel:order")
-async def cancel_callback(c: CallbackQuery):
-    uid = c.from_user.id
-    if await check_banned(uid):
-        return
-    
-    u = get_user(uid)
-    u.clear()
-    u.update(blank_user())
-    u["username"] = c.from_user.username
-    await save_state()
-    await safe_answer(c)
-    await c.message.edit_text("❌ Պատվերը չեղարկվեց։", reply_markup=main_kb())
 
 @dp.message(Command("stats"))
 async def stats_command(message: Message):
@@ -769,7 +746,6 @@ async def payment_telcell(c: CallbackQuery):
         f"<i>Արագ ու անվտանգ գնումներ։</i> 💎",
         reply_markup=back_payment_kb()
     )
-    await notify_admin(f"📸 Կլիենտը ընտրեց Telcell\n👤 @{c.from_user.username}\n📦 {u.get('product', '—')}\n💰 {fmt(u['price'])} ֏")
 
 @dp.callback_query(F.data == "back:payment")
 async def back_payment(c: CallbackQuery):
@@ -834,7 +810,7 @@ async def photo_input(message: Message):
     
     await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
     await message.answer(
-        "📸 Վճարման screenshot-ը ստացվեց։\n\n🎯 Հիմա ուղարկիր քո <b>Game ID / Username</b>։",
+        "📸 Վճարման screenshot-ը ստացվեց։\n\n✅ Այժմ ադմինը կստուգի այն։\n\n🎯 Հիմա ուղարկիր քո <b>Game ID / Username</b>։",
         reply_markup=back_main_kb()
     )
 
@@ -1108,8 +1084,6 @@ async def order_complete(c: CallbackQuery):
     await save_state()
     await update_admin_order(uid, None)
     
-    await notify_admin(f"✅ Պատվեր #{order_id} ավարտվեց։\n👤 @{username}\n🎮 {CATALOG.get(game, {}).get('name', '—')}")
-    
     await send_client(uid, "🎉 <b>Պատվերը ավարտված է։</b>\n\n✅ Դուք ստացել եք ձեր ապրանքը։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։\n\n💎 <b>Games Vault Shop</b> 🎮", main_kb())
     await safe_answer(c, "Պատվերը ավարտվեց")
 
@@ -1154,8 +1128,6 @@ async def refund_action(c: CallbackQuery):
     
     await save_state()
     await update_admin_order(uid, None)
-    
-    await notify_admin(f"💸 Վերադարձ պատվեր #{order_id}\n👤 @{username}\n🎮 {CATALOG.get(game, {}).get('name', '—')}\n💳 {method}")
     
     await send_client(uid, f"💸 Վերադարձի հայտը ընդունվեց։ Եղանակ՝ <b>{method}</b>։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։", main_kb())
     await safe_answer(c, "Վերադարձը նշվեց")
