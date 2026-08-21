@@ -206,8 +206,10 @@ def product_kb(game):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"back:game:{game}")]
     ])
 
+# ⭐ Payment կլավիատուրա (կարտով կոճակով)
 def payment_kb():
     return kb([
+        [InlineKeyboardButton(text="💳 Քարտով", callback_data="payment:card")],
         [InlineKeyboardButton(text="💵 Telcell", callback_data="payment:telcell")],
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:product")]
     ])
@@ -545,7 +547,7 @@ async def unknown_message(message: Message):
             "1️⃣ Ընտրիր խաղ գլխավոր մենյուից\n"
             "2️⃣ Ընտրիր ապրանքը\n"
             "3️⃣ Հետևիր հրահանգներին\n\n"
-            "📌 Եթե ինչ-որ բան չի աշխատում, սեղմիր «❌ Չեղարկել» և սկսիր նորից։",
+            "📌 Եթե ինչ-որ բան չի աշխատում, կարող ես սկսել նորից՝ գրելով /cancel",
             reply_markup=main_kb()
         )
 
@@ -713,6 +715,17 @@ async def back_product(c: CallbackQuery):
     await c.message.edit_text(
         f"📦 <b>{escape(u['product'])}</b>\n\n💰 Գին՝ <b>{fmt(u.get('price') or 0)} ֏</b>",
         reply_markup=product_kb(u['game'])
+    )
+
+@dp.callback_query(F.data == "payment:card")
+async def payment_card(c: CallbackQuery):
+    uid = c.from_user.id
+    if await check_banned(uid):
+        return
+    
+    await c.answer(
+        "❌ Քարտով վճարումը ժամանակավորապես հասանելի չէ։\nԽնդրում ենք ընտրել Telcell։",
+        show_alert=True
     )
 
 @dp.callback_query(F.data == "payment:telcell")
