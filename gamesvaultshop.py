@@ -262,14 +262,14 @@ async def safe_answer(c, text=None):
 
 async def send_client(uid, text, markup=None):
     try: 
-        await bot.send_message(uid, text, parse_mode="HTML", reply_markup=markup)
+        await bot.send_message(uid, text,  reply_markup=markup)
     except Exception: 
         logging.exception("Client message failed")
 
 async def send_client_photo(uid, photo_path, caption, markup=None):
     try:
         photo = FSInputFile(photo_path)
-        await bot.send_photo(uid, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
+        await bot.send_photo(uid, photo, caption=caption,  reply_markup=markup)
     except Exception:
         logging.exception("Send photo failed")
         await send_client(uid, caption, markup)
@@ -283,7 +283,7 @@ async def update_admin_order(uid, markup=None):
             chat_id=u["order_chat_id"],
             message_id=u["order_message_id"],
             caption=order_caption(uid),
-            parse_mode="HTML",
+            
             reply_markup=markup
         )
     except Exception: 
@@ -307,7 +307,7 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
             sent = await bot.send_photo(
                 chat_id, file_id, 
                 caption=order_caption(uid), 
-                parse_mode="HTML", 
+                 
                 reply_markup=markup
             )
             u["order_message_id"] = sent.message_id
@@ -331,7 +331,7 @@ async def start(message: Message):
     await save_state()
     await message.answer(
         "💎 Games Vault Shop\n\nԸնտրիր խաղը և ստացիր քո թվային ապրանքը արագ ու անվտանգ։",
-        parse_mode="HTML",
+        
         reply_markup=main_kb()
     )
 
@@ -349,7 +349,7 @@ async def back_main(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
-        parse_mode="HTML",
+        
         reply_markup=main_kb()
     )
 
@@ -366,7 +366,7 @@ async def choose_game(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        parse_mode="HTML",
+        
         reply_markup=game_kb(game)
     )
 
@@ -378,7 +378,7 @@ async def back_game(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        parse_mode="HTML",
+        
         reply_markup=game_kb(game)
     )
 
@@ -426,7 +426,7 @@ async def choose_product(c: CallbackQuery):
             f"Ուղարկիր screenshot-ը, որտեղ հստակ երևում է, որ քո հաշվում {escape(name)} է։\n\n"
             f"⚠️ Screenshot-ը պետք է լինի ամբողջական և լավ տեսանելի։\n\n"
             f"Ադմինը screenshot-ը ստուգելուց հետո ինքը կընտրի ճիշտ գինը։",
-            parse_mode="HTML",
+            
             reply_markup=back_main_kb()
         )
         return
@@ -457,7 +457,7 @@ async def choose_product(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"📦 {escape(name)}\n\n💰 Գին՝ {fmt(price)} ֏\n\nՇարունակե՞նք գնումը։",
-        parse_mode="HTML",
+        
         reply_markup=product_kb(game)
     )
 
@@ -477,7 +477,7 @@ async def buy_confirm(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"💳 Վճարման եղանակ\n\nՊատվեր՝ {escape(u['product'])}\nԳին՝ {fmt(u['price'])} ֏",
-        parse_mode="HTML",
+        
         reply_markup=payment_kb()
     )
 
@@ -490,14 +490,14 @@ async def back_product(c: CallbackQuery):
             await safe_answer(c)
             await c.message.edit_text(
                 f"📦 {escape(u['product'])}\n\n💰 Գինը ընտրված է՝ {fmt(u.get('price'))} ֏\n\nՇարունակե՞նք գնումը։",
-                parse_mode="HTML",
+                
                 reply_markup=product_kb(u['game'])
             )
         else:
             await safe_answer(c)
             await c.message.edit_text(
                 f"📸 {escape(u['product'])}\n\n⏳ Սպասում ենք ադմինի կողմից գնի ընտրությանը։",
-                parse_mode="HTML",
+                
                 reply_markup=back_main_kb()
             )
         return
@@ -508,7 +508,7 @@ async def back_product(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"📦 {escape(u['product'])}\n\n💰 Գին՝ {fmt(u.get('price') or 0)} ֏",
-        parse_mode="HTML",
+        
         reply_markup=product_kb(u['game'])
     )
 
@@ -531,7 +531,7 @@ async def payment_card(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"💳 Քարտով վճարում\n\nՔարտ՝ {escape(CARD_NUMBER)}\nԳումար՝ {fmt(u['price'])} ֏\n\nՎճարումից հետո ուղարկիր screenshot-ը։",
-        parse_mode="HTML",
+        
         reply_markup=back_payment_kb()
     )
 
@@ -560,7 +560,7 @@ async def payment_telcell(c: CallbackQuery):
         f"✅ Screenshot-ը ստանալուց հետո կհաստատենք պատվերը։\n\n"
         f"Games Vault Shop 🎮\n"
         f"Արագ ու անվտանգ գնումներ։ 💎",
-        parse_mode="HTML",
+        
         reply_markup=back_payment_kb()
     )
 
@@ -569,7 +569,7 @@ async def back_payment(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "💳 Ընտրիր վճարման եղանակը",
-        parse_mode="HTML",
+        
         reply_markup=payment_kb()
     )
 
@@ -591,7 +591,7 @@ async def photo_input(message: Message):
         
         await message.answer(
             f"📸 Screenshot-ը ստացվեց։\n\n⏳ Սպասիր՝ ադմինը կստուգի screenshot-ը և կընտրի համապատասխան գինը {product_name}-ի համար։",
-            parse_mode="HTML",
+            
             reply_markup=back_main_kb()
         )
         return
@@ -606,7 +606,7 @@ async def photo_input(message: Message):
         await create_or_replace_order(uid, file_id, admin_main_kb(uid))
         await message.answer(
             "📸 Նոր չեկի screenshot-ը ստացվեց։\n\n✅ Այժմ ադմինը կստուգի այն։",
-            parse_mode="HTML",
+            
             reply_markup=main_kb()
         )
         return
@@ -617,7 +617,7 @@ async def photo_input(message: Message):
     if not u.get("price"):
         await message.answer(
             "⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։",
-            parse_mode="HTML",
+            
             reply_markup=back_main_kb()
         )
         return
@@ -636,7 +636,7 @@ async def photo_input(message: Message):
         "🎯 ՈՒՂԱՐԿԻՐ քո Game ID / Username-ը\n"
         "📝 Օրինակ՝ Player123 կամ @username\n\n"
         "✏️ Պարզապես գրիր և ուղարկիր այս chat-ում։",
-        parse_mode="HTML",
+        
         reply_markup=back_main_kb()
     )
 
@@ -658,7 +658,7 @@ async def text_input(message: Message):
                 "✅ 2FA կոդը հաստատվեց։\n\n"
                 "Պատվերը պատրաստ է ավարտման։\n\n"
                 "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
-                parse_mode="HTML",
+                
                 reply_markup=main_kb()
             )
             return
@@ -670,7 +670,7 @@ async def text_input(message: Message):
                 f"❌ Սխալ կոդ (փորձ #{u['verification_attempts']})\n\n"
                 f"Մուտքագրիր 6-նիշանի կոդը (միայն թվեր)։\n\n"
                 f"📝 Օրինակ՝ 123456",
-                parse_mode="HTML",
+                
                 reply_markup=back_main_kb()
             )
             return
@@ -708,7 +708,7 @@ async def text_input(message: Message):
             "🔑 ՈՒՂԱՐԿԻՐ պասսվորդը\n"
             "📝 Օրինակ՝ MyPassword123\n\n"
             "✏️ Պարզապես գրիր և ուղարկիր այս chat-ում։",
-            parse_mode="HTML",
+            
             reply_markup=back_main_kb()
         )
         return
@@ -721,12 +721,12 @@ async def text_input(message: Message):
         await update_admin_order(uid, admin_main_kb(uid))
         await message.answer(
             "✅ Պասսվորդը ստացվեց։\n\n⏳ Սպասիր ադմինի կողմից չեկի հաստատմանը։",
-            parse_mode="HTML",
+            
             reply_markup=main_kb()
         )
         return
     
-    await message.answer("Ընտրիր բաժինը։", parse_mode="HTML", reply_markup=main_kb())
+    await message.answer("Ընտրիր բաժինը։",  reply_markup=main_kb())
 
 @dp.callback_query(F.data == "contact:open")
 async def contact_open(c: CallbackQuery):
@@ -736,7 +736,7 @@ async def contact_open(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "📩 Կապ Games Vault Shop-ի հետ\n\nՈւղարկիր հաղորդագրություն, և մենք կպատասխանենք։",
-        parse_mode="HTML",
+        
         reply_markup=back_main_kb()
     )
 
@@ -807,7 +807,7 @@ async def bp_reject(c: CallbackQuery):
         f"Ուղարկիր նոր, ամբողջական և ավելի հստակ screenshot {u['product']}-ի համար։\n\n"
         f"📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։\n\n"
         f"⚠️ Հին պատվերը չի կրկնվի, սպասում ենք նոր screenshot-ի։",
-        parse_mode="HTML",
+        
         reply_markup=back_main_kb()
     )
     
@@ -871,7 +871,7 @@ async def receipt_bad(c: CallbackQuery):
         "• ամբողջական (երևում է ամբողջ չեկը)\n"
         "• լավ լուսավորված\n\n"
         "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
-        parse_mode="HTML",
+        
         back_main_kb()
     )
     
@@ -971,7 +971,7 @@ async def verify_menu(c: CallbackQuery):
         "🔐 Authenticator - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
         "📧 E-mail - մուտքագրիր կոդը E-mail-ից\n\n"
         "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
-        parse_mode="HTML",
+        
         reply_markup=verify_catalog_kb(uid)
     )
 
@@ -985,7 +985,7 @@ async def verify_back(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        parse_mode="HTML",
+        
         reply_markup=admin_main_kb(uid)
     )
 
@@ -1020,7 +1020,7 @@ async def verify_device(c: CallbackQuery):
     await c.message.edit_text(
         "✅ 2FA՝ Այլ սարքով հաստատում — հրահանգը ուղարկվեց клиенту\n\n"
         "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        parse_mode="HTML",
+        
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "✅ 2FA՝ Այլ սարք — հրահանգը ուղարկվեց")
@@ -1056,7 +1056,7 @@ async def verify_auth(c: CallbackQuery):
     await c.message.edit_text(
         "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        parse_mode="HTML",
+        
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
@@ -1092,7 +1092,7 @@ async def verify_email(c: CallbackQuery):
     await c.message.edit_text(
         "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        parse_mode="HTML",
+        
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
@@ -1143,7 +1143,7 @@ async def verify_retry(c: CallbackQuery):
         "🔄 Նոր 2FA կոդը ուղարկվեց клиенту\n\n"
         "⏳ Սպասում ենք նոր կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        parse_mode="HTML",
+        
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "🔄 Նոր կոդը ուղարկվեց клиенту")
