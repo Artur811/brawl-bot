@@ -121,6 +121,7 @@ def kb(rows):
 def is_brawl_pass(product):
     return product in BRAWL_PASS_PRICES
 
+# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="🎮 Roblox", callback_data="game:roblox"), 
@@ -218,14 +219,15 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
+# ⭐ order_caption - ԱՌԱՆՑ HTML ԹԵԳԵՐԻ
 def order_caption(uid):
     u = get_user(uid)
     
     if u.get("is_completed"):
-        return (f"📋 <b>Պատվեր #{escape(str(u.get('order_id') or '—'))}</b>\n"
+        return (f"📋 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
                 f"👤 {escape(str(u.get('username') or 'չկա'))}\n"
                 f"🎮 {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
-                f"📌 <b>{escape(str(u.get('status') or '—'))}</b>")
+                f"📌 {escape(str(u.get('status') or '—'))}")
     
     price = fmt(u.get("price") or 0) if u.get("price") else "Ադմինը դեռ չի ընտրել"
     verify_status = ""
@@ -241,14 +243,16 @@ def order_caption(uid):
     elif u.get("verification_code_waiting"):
         verify_status = " (⏳ Սպասվում է 2FA կոդ)"
     
-    return (f"🧾 <b>Պատվեր #{escape(str(u.get('order_id') or '—'))}</b>\n"
-            f"👤 ID: <code>{uid}</code>\n🔹 Username: @{escape(str(u.get('username') or 'չկա'))}\n"
+    return (f"🧾 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
+            f"👤 ID: {uid}\n"
+            f"🔹 Username: @{escape(str(u.get('username') or 'չկա'))}\n"
             f"🎮 Խաղ: {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
-            f"📦 Ապրանք: <b>{escape(str(u.get('product') or '—'))}</b>\n"
-            f"💰 Գին: <b>{price} ֏</b>\n💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
-            f"🎯 Game ID / Username: <code>{escape(str(u.get('game_id') or '—'))}</code>\n"
-            f"🔑 Պասսվորդ: <code>{escape(str(u.get('game_password') or '—'))}</code>\n"
-            f"📌 <b>Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}</b>")
+            f"📦 Ապրանք: {escape(str(u.get('product') or '—'))}\n"
+            f"💰 Գին: {price} ֏\n"
+            f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
+            f"🎯 Game ID / Username: {escape(str(u.get('game_id') or '—'))}\n"
+            f"🔑 Պասսվորդ: {escape(str(u.get('game_password') or '—'))}\n"
+            f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
 
 async def safe_answer(c, text=None):
     try: 
@@ -258,14 +262,14 @@ async def safe_answer(c, text=None):
 
 async def send_client(uid, text, markup=None):
     try: 
-        await bot.send_message(uid, text,  reply_markup=markup)
+        await bot.send_message(uid, text, parse_mode="HTML", reply_markup=markup)
     except Exception: 
         logging.exception("Client message failed")
 
 async def send_client_photo(uid, photo_path, caption, markup=None):
     try:
         photo = FSInputFile(photo_path)
-        await bot.send_photo(uid, photo, caption=caption,  reply_markup=markup)
+        await bot.send_photo(uid, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
     except Exception:
         logging.exception("Send photo failed")
         await send_client(uid, caption, markup)
@@ -279,7 +283,7 @@ async def update_admin_order(uid, markup=None):
             chat_id=u["order_chat_id"],
             message_id=u["order_message_id"],
             caption=order_caption(uid),
-            
+            parse_mode="HTML",
             reply_markup=markup
         )
     except Exception: 
@@ -303,7 +307,7 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
             sent = await bot.send_photo(
                 chat_id, file_id, 
                 caption=order_caption(uid), 
-                 
+                parse_mode="HTML", 
                 reply_markup=markup
             )
             u["order_message_id"] = sent.message_id
@@ -326,8 +330,8 @@ async def start(message: Message):
     u["username"] = message.from_user.username
     await save_state()
     await message.answer(
-        "💎 <b>Games Vault Shop</b>\n\nԸնտրիր խաղը և ստացիր քո թվային ապրանքը արագ ու անվտանգ։",
-        
+        "💎 Games Vault Shop\n\nԸնտրիր խաղը և ստացիր քո թվային ապրանքը արագ ու անվտանգ։",
+        parse_mode="HTML",
         reply_markup=main_kb()
     )
 
@@ -344,8 +348,8 @@ async def cancel(message: Message):
 async def back_main(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
-        "💎 <b>Games Vault Shop</b>\n\nԸնտրիր խաղը։",
-        
+        "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
+        parse_mode="HTML",
         reply_markup=main_kb()
     )
 
@@ -362,7 +366,7 @@ async def choose_game(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        
+        parse_mode="HTML",
         reply_markup=game_kb(game)
     )
 
@@ -374,7 +378,7 @@ async def back_game(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        
+        parse_mode="HTML",
         reply_markup=game_kb(game)
     )
 
@@ -418,11 +422,11 @@ async def choose_product(c: CallbackQuery):
         await safe_answer(c)
         
         await c.message.edit_text(
-            f"📸 <b>{escape(name)}</b>\n\n"
-            f"Ուղարկիր screenshot-ը, որտեղ հստակ երևում է, որ քո հաշվում <b>{escape(name)}</b> է։\n\n"
+            f"📸 {escape(name)}\n\n"
+            f"Ուղարկիր screenshot-ը, որտեղ հստակ երևում է, որ քո հաշվում {escape(name)} է։\n\n"
             f"⚠️ Screenshot-ը պետք է լինի ամբողջական և լավ տեսանելի։\n\n"
             f"Ադմինը screenshot-ը ստուգելուց հետո ինքը կընտրի ճիշտ գինը։",
-            
+            parse_mode="HTML",
             reply_markup=back_main_kb()
         )
         return
@@ -452,8 +456,8 @@ async def choose_product(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        f"📦 <b>{escape(name)}</b>\n\n💰 Գին՝ <b>{fmt(price)} ֏</b>\n\nՇարունակե՞նք գնումը։",
-        
+        f"📦 {escape(name)}\n\n💰 Գին՝ {fmt(price)} ֏\n\nՇարունակե՞նք գնումը։",
+        parse_mode="HTML",
         reply_markup=product_kb(game)
     )
 
@@ -472,8 +476,8 @@ async def buy_confirm(c: CallbackQuery):
     
     await safe_answer(c)
     await c.message.edit_text(
-        f"💳 <b>Վճարման եղանակ</b>\n\nՊատվեր՝ {escape(u['product'])}\nԳին՝ <b>{fmt(u['price'])} ֏</b>",
-        
+        f"💳 Վճարման եղանակ\n\nՊատվեր՝ {escape(u['product'])}\nԳին՝ {fmt(u['price'])} ֏",
+        parse_mode="HTML",
         reply_markup=payment_kb()
     )
 
@@ -485,15 +489,15 @@ async def back_product(c: CallbackQuery):
         if u.get("brawl_pass_price_selected"):
             await safe_answer(c)
             await c.message.edit_text(
-                f"📦 <b>{escape(u['product'])}</b>\n\n💰 Գինը ընտրված է՝ <b>{fmt(u.get('price'))} ֏</b>\n\nՇարունակե՞նք գնումը։",
-                
+                f"📦 {escape(u['product'])}\n\n💰 Գինը ընտրված է՝ {fmt(u.get('price'))} ֏\n\nՇարունակե՞նք գնումը։",
+                parse_mode="HTML",
                 reply_markup=product_kb(u['game'])
             )
         else:
             await safe_answer(c)
             await c.message.edit_text(
-                f"📸 <b>{escape(u['product'])}</b>\n\n⏳ Սպասում ենք ադմինի կողմից գնի ընտրությանը։",
-                
+                f"📸 {escape(u['product'])}\n\n⏳ Սպասում ենք ադմինի կողմից գնի ընտրությանը։",
+                parse_mode="HTML",
                 reply_markup=back_main_kb()
             )
         return
@@ -503,8 +507,8 @@ async def back_product(c: CallbackQuery):
     
     await safe_answer(c)
     await c.message.edit_text(
-        f"📦 <b>{escape(u['product'])}</b>\n\n💰 Գին՝ <b>{fmt(u.get('price') or 0)} ֏</b>",
-        
+        f"📦 {escape(u['product'])}\n\n💰 Գին՝ {fmt(u.get('price') or 0)} ֏",
+        parse_mode="HTML",
         reply_markup=product_kb(u['game'])
     )
 
@@ -526,8 +530,8 @@ async def payment_card(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        f"💳 <b>Քարտով վճարում</b>\n\nՔարտ՝ <code>{escape(CARD_NUMBER)}</code>\nԳումար՝ <b>{fmt(u['price'])} ֏</b>\n\nՎճարումից հետո ուղարկիր screenshot-ը։",
-        
+        f"💳 Քարտով վճարում\n\nՔարտ՝ {escape(CARD_NUMBER)}\nԳումար՝ {fmt(u['price'])} ֏\n\nՎճարումից հետո ուղարկիր screenshot-ը։",
+        parse_mode="HTML",
         reply_markup=back_payment_kb()
     )
 
@@ -541,22 +545,22 @@ async def payment_telcell(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        f"💵 <b>Telcell-ով վճարում</b>\n\n"
-        f"<b>Հարգելի հաճախորդ,</b>\n"
-        f"Ձեր պատվերը ստանալու համար խնդրում ենք կատարել վճարում <b>Telcell</b>-ի միջոցով։\n\n"
-        f"📌 <b>Քայլ 1.</b> Գնացեք ձեր քաղաքի <b>մոտակա Telcell</b> տերմինալ։\n"
-        f"📌 <b>Քայլ 2.</b> Ընտրեք <b>«Telcell Wallet»</b> բաժինը։\n"
-        f"📌 <b>Քայլ 3.</b> Մուտքագրեք մեր համարը՝\n"
-        f"📞 <code>{TELCELL_NUMBER}</code>\n\n"
-        f"📌 <b>Քայլ 4.</b> Մուտքագրեք գումարը՝\n"
-        f"💰 <b>{fmt(u['price'])} ֏</b>\n\n"
-        f"📌 <b>Քայլ 5.</b> Հաստատեք վճարումը։\n"
-        f"📌 <b>Քայլ 6.</b> Չեկի լուսանկարն ուղարկեք այս chat-ում։\n\n"
-        f"⚠️ <b>Կարևոր է.</b> Չեկի լուսանկարը պետք է լինի <b>պարզ և ընթեռնելի</b>։\n\n"
+        f"💵 Telcell-ով վճարում\n\n"
+        f"Հարգելի հաճախորդ,\n"
+        f"Ձեր պատվերը ստանալու համար խնդրում ենք կատարել վճարում Telcell-ի միջոցով։\n\n"
+        f"📌 Քայլ 1. Գնացեք ձեր քաղաքի մոտակա Telcell տերմինալ։\n"
+        f"📌 Քայլ 2. Ընտրեք «Telcell Wallet» բաժինը։\n"
+        f"📌 Քայլ 3. Մուտքագրեք մեր համարը՝\n"
+        f"📞 {TELCELL_NUMBER}\n\n"
+        f"📌 Քայլ 4. Մուտքագրեք գումարը՝\n"
+        f"💰 {fmt(u['price'])} ֏\n\n"
+        f"📌 Քայլ 5. Հաստատեք վճարումը։\n"
+        f"📌 Քայլ 6. Չեկի լուսանկարն ուղարկեք այս chat-ում։\n\n"
+        f"⚠️ Կարևոր է. Չեկի լուսանկարը պետք է լինի պարզ և ընթեռնելի։\n\n"
         f"✅ Screenshot-ը ստանալուց հետո կհաստատենք պատվերը։\n\n"
-        f"<b>Games Vault Shop</b> 🎮\n"
-        f"<i>Արագ ու անվտանգ գնումներ։</i> 💎",
-        
+        f"Games Vault Shop 🎮\n"
+        f"Արագ ու անվտանգ գնումներ։ 💎",
+        parse_mode="HTML",
         reply_markup=back_payment_kb()
     )
 
@@ -564,8 +568,8 @@ async def payment_telcell(c: CallbackQuery):
 async def back_payment(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
-        "💳 <b>Ընտրիր վճարման եղանակը</b>",
-        
+        "💳 Ընտրիր վճարման եղանակը",
+        parse_mode="HTML",
         reply_markup=payment_kb()
     )
 
@@ -587,7 +591,7 @@ async def photo_input(message: Message):
         
         await message.answer(
             f"📸 Screenshot-ը ստացվեց։\n\n⏳ Սպասիր՝ ադմինը կստուգի screenshot-ը և կընտրի համապատասխան գինը {product_name}-ի համար։",
-            
+            parse_mode="HTML",
             reply_markup=back_main_kb()
         )
         return
@@ -602,7 +606,7 @@ async def photo_input(message: Message):
         await create_or_replace_order(uid, file_id, admin_main_kb(uid))
         await message.answer(
             "📸 Նոր չեկի screenshot-ը ստացվեց։\n\n✅ Այժմ ադմինը կստուգի այն։",
-            
+            parse_mode="HTML",
             reply_markup=main_kb()
         )
         return
@@ -613,6 +617,7 @@ async def photo_input(message: Message):
     if not u.get("price"):
         await message.answer(
             "⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։",
+            parse_mode="HTML",
             reply_markup=back_main_kb()
         )
         return
@@ -626,8 +631,12 @@ async def photo_input(message: Message):
     
     await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
     await message.answer(
-        "📸 Վճարման screenshot-ը ստացվեց։\n\n🎯 Հիմա ուղարկիր քո <b>Game ID / Username</b>։",
-        
+        "📸 Վճարման screenshot-ը ստացվեց։\n\n"
+        "✅ Այժմ ադմինը կստուգի այն։\n\n"
+        "🎯 ՈՒՂԱՐԿԻՐ քո Game ID / Username-ը\n"
+        "📝 Օրինակ՝ Player123 կամ @username\n\n"
+        "✏️ Պարզապես գրիր և ուղարկիր այս chat-ում։",
+        parse_mode="HTML",
         reply_markup=back_main_kb()
     )
 
@@ -646,10 +655,10 @@ async def text_input(message: Message):
             await save_state()
             await update_admin_order(uid, admin_main_kb(uid))
             await message.answer(
-                "✅ <b>2FA կոդը հաստատվեց։</b>\n\n"
+                "✅ 2FA կոդը հաստատվեց։\n\n"
                 "Պատվերը պատրաստ է ավարտման։\n\n"
                 "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
-                
+                parse_mode="HTML",
                 reply_markup=main_kb()
             )
             return
@@ -658,10 +667,10 @@ async def text_input(message: Message):
             await save_state()
             
             await message.answer(
-                f"❌ <b>Սխալ կոդ</b> (փորձ #{u['verification_attempts']})\n\n"
-                f"Մուտքագրիր <b>6-նիշանի կոդը</b> (միայն թվեր)։\n\n"
-                f"📝 Օրինակ՝ <code>123456</code>",
-                
+                f"❌ Սխալ կոդ (փորձ #{u['verification_attempts']})\n\n"
+                f"Մուտքագրիր 6-նիշանի կոդը (միայն թվեր)։\n\n"
+                f"📝 Օրինակ՝ 123456",
+                parse_mode="HTML",
                 reply_markup=back_main_kb()
             )
             return
@@ -670,7 +679,7 @@ async def text_input(message: Message):
         if SUPPORT_CHANNEL_ID:
             await bot.send_message(
                 int(SUPPORT_CHANNEL_ID),
-                f"📩 <b>Support</b>\n👤 <code>{uid}</code>\n@{escape(message.from_user.username or 'չկա')}\n\n{escape(text)}",
+                f"📩 Support\n👤 {uid}\n@{escape(message.from_user.username or 'չկա')}\n\n{escape(text)}",
                 parse_mode="HTML"
             )
         u["support_waiting"] = False
@@ -695,8 +704,11 @@ async def text_input(message: Message):
         await save_state()
         await update_admin_order(uid, admin_password_reject_kb(uid))
         await message.answer(
-            "✅ ID / Username-ը ստացվեց։\n\n🔑 Հիմա ուղարկիր <b>պասսվորդը</b> (password)։",
-            
+            "✅ ID / Username-ը ստացվեց։\n\n"
+            "🔑 ՈՒՂԱՐԿԻՐ պասսվորդը\n"
+            "📝 Օրինակ՝ MyPassword123\n\n"
+            "✏️ Պարզապես գրիր և ուղարկիր այս chat-ում։",
+            parse_mode="HTML",
             reply_markup=back_main_kb()
         )
         return
@@ -709,12 +721,12 @@ async def text_input(message: Message):
         await update_admin_order(uid, admin_main_kb(uid))
         await message.answer(
             "✅ Պասսվորդը ստացվեց։\n\n⏳ Սպասիր ադմինի կողմից չեկի հաստատմանը։",
-            
+            parse_mode="HTML",
             reply_markup=main_kb()
         )
         return
     
-    await message.answer("Ընտրիր բաժինը։", reply_markup=main_kb())
+    await message.answer("Ընտրիր բաժինը։", parse_mode="HTML", reply_markup=main_kb())
 
 @dp.callback_query(F.data == "contact:open")
 async def contact_open(c: CallbackQuery):
@@ -723,8 +735,8 @@ async def contact_open(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        "📩 <b>Կապ Games Vault Shop-ի հետ</b>\n\nՈւղարկիր հաղորդագրություն, և մենք կպատասխանենք։",
-        
+        "📩 Կապ Games Vault Shop-ի հետ\n\nՈւղարկիր հաղորդագրություն, և մենք կպատասխանենք։",
+        parse_mode="HTML",
         reply_markup=back_main_kb()
     )
 
@@ -758,9 +770,9 @@ async def bp_set_price(c: CallbackQuery):
     
     await send_client(
         uid,
-        f"✅ <b>Screenshot-ը հաստատվեց։</b>\n\n"
+        f"✅ Screenshot-ը հաստատվեց։\n\n"
         f"📦 {escape(u['product'])}\n"
-        f"💰 Ձեր գինը՝ <b>{fmt(price)} ֏</b>\n\n"
+        f"💰 Ձեր գինը՝ {fmt(price)} ֏\n\n"
         f"Սեղմիր «Շարունակել գնումը», որպեսզի ընտրես վճարման եղանակը։",
         kb([
             [InlineKeyboardButton(text="💳 Շարունակել գնումը", callback_data="buy:confirm")],
@@ -791,11 +803,11 @@ async def bp_reject(c: CallbackQuery):
     
     await send_client(
         uid,
-        f"❌ <b>Screenshot-ը սխալ է կամ լավ չի երևում</b>\n\n"
-        f"Ուղարկիր <b>նոր, ամբողջական և ավելի հստակ screenshot</b> {u['product']}-ի համար։\n\n"
+        f"❌ Screenshot-ը սխալ է կամ լավ չի երևում\n\n"
+        f"Ուղարկիր նոր, ամբողջական և ավելի հստակ screenshot {u['product']}-ի համար։\n\n"
         f"📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։\n\n"
         f"⚠️ Հին պատվերը չի կրկնվի, սպասում ենք նոր screenshot-ի։",
-        
+        parse_mode="HTML",
         reply_markup=back_main_kb()
     )
     
@@ -815,7 +827,7 @@ async def admin_id_reject(c: CallbackQuery):
     u["game_id"] = None
     u["status"] = "⏳ Սպասվում է նոր ID"
     await save_state()
-    await send_client(uid, "❌ <b>Սխալ ID / Username</b>\n\nՈւղարկիր ճիշտ Game ID / Username-ը։", back_main_kb())
+    await send_client(uid, "❌ Սխալ ID / Username\n\nՈւղարկիր ճիշտ Game ID / Username-ը։", back_main_kb())
     await update_admin_order(uid, admin_id_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր ID")
 
@@ -832,7 +844,7 @@ async def admin_password_reject(c: CallbackQuery):
     u["game_password"] = None
     u["status"] = "⏳ Սպասվում է նոր պասսվորդ"
     await save_state()
-    await send_client(uid, "❌ <b>Սխալ պասսվորդ</b>\n\nՈւղարկիր ճիշտ պասսվորդը։", back_main_kb())
+    await send_client(uid, "❌ Սխալ պասսվորդ\n\nՈւղարկիր ճիշտ պասսվորդը։", back_main_kb())
     await update_admin_order(uid, admin_password_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր պասսվորդ")
 
@@ -852,14 +864,14 @@ async def receipt_bad(c: CallbackQuery):
     
     await send_client(
         uid,
-        "📸 <b>Չեկի screenshot-ը վատ է երևում</b>\n\n"
-        "Խնդրում ենք ուղարկել <b>նոր, ավելի հստակ screenshot</b> չեկից։\n\n"
+        "📸 Չեկի screenshot-ը վատ է երևում\n\n"
+        "Խնդրում ենք ուղարկել նոր, ավելի հստակ screenshot չեկից։\n\n"
         "✅ Համոզվեք, որ լուսանկարը՝\n"
-        "• <b>պարզ</b> է և առանց լղոզման\n"
-        "• <b>ամբողջական</b> (երևում է ամբողջ չեկը)\n"
-        "• <b>լավ լուսավորված</b>\n\n"
+        "• պարզ է և առանց լղոզման\n"
+        "• ամբողջական (երևում է ամբողջ չեկը)\n"
+        "• լավ լուսավորված\n\n"
         "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
-        
+        parse_mode="HTML",
         back_main_kb()
     )
     
@@ -902,7 +914,7 @@ async def order_complete(c: CallbackQuery):
     
     await save_state()
     await update_admin_order(uid, None)
-    await send_client(uid, "🎉 <b>Պատվերը ավարտված է։</b>\n\n✅ Դուք ստացել եք ձեր ապրանքը։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։\n\n💎 <b>Games Vault Shop</b> 🎮", main_kb())
+    await send_client(uid, "🎉 Պատվերը ավարտված է։\n\n✅ Դուք ստացել եք ձեր ապրանքը։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։\n\n💎 Games Vault Shop 🎮", main_kb())
     await safe_answer(c, "Պատվերը ավարտվեց")
 
 @dp.callback_query(F.data.startswith("refund:"))
@@ -920,7 +932,7 @@ async def refund_action(c: CallbackQuery):
         u["status"] = "💸 Սպասվում են վերադարձի տվյալներ"
         await save_state()
         await update_admin_order(uid, admin_refund_kb(uid))
-        await send_client(uid, "💸 <b>Վերադարձ</b>\n\nՈւղարկիր այն տվյալները, որոնցով պետք է կատարվի վերադարձը։")
+        await send_client(uid, "💸 Վերադարձ\n\nՈւղարկիր այն տվյալները, որոնցով պետք է կատարվի վերադարձը։")
         await safe_answer(c)
         return
     
@@ -941,7 +953,7 @@ async def refund_action(c: CallbackQuery):
     
     await save_state()
     await update_admin_order(uid, None)
-    await send_client(uid, f"💸 Վերադարձի հայտը ընդունվեց։ Եղանակ՝ <b>{method}</b>։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։", main_kb())
+    await send_client(uid, f"💸 Վերադարձի հայտը ընդունվեց։ Եղանակ՝ {method}։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։", main_kb())
     await safe_answer(c, "Վերադարձը նշվեց")
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
@@ -953,13 +965,13 @@ async def verify_menu(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     await safe_answer(c)
     await c.message.edit_text(
-        "🔐 <b>2FA հաստատում</b>\n\n"
+        "🔐 2FA հաստատում\n\n"
         "Ընտրիր հաստատման եղանակը՝\n\n"
-        "📱 <b>Այլ սարքով</b> - հաստատիր մեկ այլ սարքից\n"
-        "🔐 <b>Authenticator</b> - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
-        "📧 <b>E-mail</b> - մուտքագրիր կոդը E-mail-ից\n\n"
+        "📱 Այլ սարքով - հաստատիր մեկ այլ սարքից\n"
+        "🔐 Authenticator - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
+        "📧 E-mail - մուտքագրիր կոդը E-mail-ից\n\n"
         "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
-        
+        parse_mode="HTML",
         reply_markup=verify_catalog_kb(uid)
     )
 
@@ -972,8 +984,8 @@ async def verify_back(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     await safe_answer(c)
     await c.message.edit_text(
-        "🛠 <b>Ադմինի վահանակ</b>\n\nԸնտրիր գործողությունը՝",
-        
+        "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
+        parse_mode="HTML",
         reply_markup=admin_main_kb(uid)
     )
 
@@ -996,19 +1008,19 @@ async def verify_device(c: CallbackQuery):
     await send_client_photo(
         uid,
         VERIFY_IMAGES["device"],
-        "📱 <b>2FA — Այլ սարքով հաստատում</b>\n\n"
+        "📱 2FA — Այլ սարքով հաստատում\n\n"
         "1️⃣ Բացիր Roblox հավելվածը մեկ այլ սարքից (հեռախոս/պլանշետ)\n"
         "2️⃣ Հաստատիր մուտքը Roblox հավելվածում\n"
         "3️⃣ Սեղմիր «Approve» կամ «Հաստատել»\n\n"
-        "⚠️ <b>Կարևոր.</b> Հաստատիր միայն այն մուտքը, որը դու ես սկսել։\n\n"
+        "⚠️ Կարևոր. Հաստատիր միայն այն մուտքը, որը դու ես սկսել։\n\n"
         "✅ Հաստատումից հետո պատվերը կավարտվի։",
         back_main_kb()
     )
     
     await c.message.edit_text(
         "✅ 2FA՝ Այլ սարքով հաստատում — հրահանգը ուղարկվեց клиенту\n\n"
-        "🛠 <b>Ադմինի վահանակ</b>\n\nԸնտրիր գործողությունը՝",
-        
+        "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
+        parse_mode="HTML",
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "✅ 2FA՝ Այլ սարք — հրահանգը ուղարկվեց")
@@ -1032,19 +1044,19 @@ async def verify_auth(c: CallbackQuery):
     await send_client_photo(
         uid,
         VERIFY_IMAGES["auth"],
-        "🔐 <b>2FA — Authenticator</b>\n\n"
+        "🔐 2FA — Authenticator\n\n"
         "1️⃣ Բացիր Google Authenticator / Microsoft Authenticator\n"
         "2️⃣ Գտիր Roblox-ի 6-նիշանի կոդը\n"
-        "3️⃣ <b>Մուտքագրիր կոդը</b> այս chat-ում\n\n"
-        "⚠️ <b>Կարևոր.</b> Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
-        "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ <code>123456</code>)",
+        "3️⃣ Մուտքագրիր կոդը այս chat-ում\n\n"
+        "⚠️ Կարևոր. Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
+        "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
         back_main_kb()
     )
     
     await c.message.edit_text(
         "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
-        "🛠 <b>Ադմինի վահանակ</b>",
-        
+        "🛠 Ադմինի վահանակ",
+        parse_mode="HTML",
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
@@ -1068,19 +1080,19 @@ async def verify_email(c: CallbackQuery):
     await send_client_photo(
         uid,
         VERIFY_IMAGES["email"],
-        "📧 <b>2FA — E-mail</b>\n\n"
+        "📧 2FA — E-mail\n\n"
         "1️⃣ Ստուգիր քո E-mail-ը (Gmail, Mail.ru, և այլն)\n"
         "2️⃣ Roblox-ը ուղարկել է 6-նիշանի հաստատման կոդ\n"
-        "3️⃣ <b>Մուտքագրիր կոդը</b> այս chat-ում\n\n"
-        "⚠️ <b>Կարևոր.</b> Ստուգիր նաև Spam պանակը։\n\n"
-        "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ <code>123456</code>)",
+        "3️⃣ Մուտքագրիր կոդը այս chat-ում\n\n"
+        "⚠️ Կարևոր. Ստուգիր նաև Spam պանակը։\n\n"
+        "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
         back_main_kb()
     )
     
     await c.message.edit_text(
         "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
-        "🛠 <b>Ադմինի վահանակ</b>",
-        
+        "🛠 Ադմինի վահանակ",
+        parse_mode="HTML",
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
@@ -1106,32 +1118,32 @@ async def verify_retry(c: CallbackQuery):
         await send_client_photo(
             uid,
             VERIFY_IMAGES["auth"],
-            "🔄 <b>Մուտքագրիր նոր 2FA կոդ — Authenticator</b>\n\n"
+            "🔄 Մուտքագրիր նոր 2FA կոդ — Authenticator\n\n"
             "1️⃣ Բացիր Google Authenticator / Microsoft Authenticator\n"
             "2️⃣ Գտիր Roblox-ի 6-նիշանի կոդը\n"
-            "3️⃣ <b>Մուտքագրիր նոր կոդը</b> այս chat-ում\n\n"
-            "⚠️ <b>Կարևոր.</b> Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
-            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ <code>123456</code>)",
+            "3️⃣ Մուտքագրիր նոր կոդը այս chat-ում\n\n"
+            "⚠️ Կարևոր. Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
+            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
             back_main_kb()
         )
     elif verify_type == "email":
         await send_client_photo(
             uid,
             VERIFY_IMAGES["email"],
-            "🔄 <b>Մուտքագրիր նոր 2FA կոդ — E-mail</b>\n\n"
+            "🔄 Մուտքագրիր նոր 2FA կոդ — E-mail\n\n"
             "1️⃣ Ստուգիր քո E-mail-ը (Gmail, Mail.ru, և այլն)\n"
             "2️⃣ Roblox-ը ուղարկել է նոր 6-նիշանի կոդ\n"
-            "3️⃣ <b>Մուտքագրիր նոր կոդը</b> այս chat-ում\n\n"
-            "⚠️ <b>Կարևոր.</b> Ստուգիր նաև Spam պանակը։\n\n"
-            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ <code>123456</code>)",
+            "3️⃣ Մուտքագրիր նոր կոդը այս chat-ում\n\n"
+            "⚠️ Կարևոր. Ստուգիր նաև Spam պանակը։\n\n"
+            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
             back_main_kb()
         )
     
     await c.message.edit_text(
         "🔄 Նոր 2FA կոդը ուղարկվեց клиенту\n\n"
         "⏳ Սպասում ենք նոր կոդի մուտքագրմանը...\n\n"
-        "🛠 <b>Ադմինի վահանակ</b>",
-        
+        "🛠 Ադմինի վահանակ",
+        parse_mode="HTML",
         reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "🔄 Նոր կոդը ուղարկվեց клиенту")
@@ -1139,7 +1151,7 @@ async def verify_retry(c: CallbackQuery):
 @dp.message(Command("admin"))
 async def admin_cmd(message: Message):
     if message.from_user.id == ADMIN_ID:
-        await message.answer("🛠 <b>Admin panel</b>\n\nԲոտը աշխատում է։", parse_mode="HTML")
+        await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։", parse_mode="HTML")
 
 async def health_handler(request):
     return web.Response(text="OK")
