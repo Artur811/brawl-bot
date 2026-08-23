@@ -121,7 +121,7 @@ def kb(rows):
 def is_brawl_pass(product):
     return product in BRAWL_PASS_PRICES
 
-# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
+# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="🎮 Roblox", callback_data="game:roblox"), 
@@ -164,6 +164,17 @@ def back_payment_kb():
 
 def back_main_kb(): 
     return kb([[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]])
+
+# ⭐ ԿՈԾԱԿՆԵՐԸ ID-ի ԵՎ PASSWORD-Ի ՀԱՄԱՐ
+def ask_id_kb():
+    return kb([
+        [InlineKeyboardButton(text="✏️ Գրել ID / Username", callback_data="ask_id")]
+    ])
+
+def ask_password_kb():
+    return kb([
+        [InlineKeyboardButton(text="✏️ Գրել Password", callback_data="ask_password")]
+    ])
 
 def admin_bp_kb(uid, product_name):
     prices = BRAWL_PASS_PRICES[product_name]
@@ -219,7 +230,6 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
-# ⭐ order_caption - ԱՌԱՆՑ HTML ԹԵԳԵՐԻ
 def order_caption(uid):
     u = get_user(uid)
     
@@ -262,14 +272,14 @@ async def safe_answer(c, text=None):
 
 async def send_client(uid, text, markup=None):
     try: 
-        await bot.send_message(uid, text, parse_mode="HTML", reply_markup=markup)
+        await bot.send_message(uid, text, reply_markup=markup)
     except Exception: 
         logging.exception("Client message failed")
 
 async def send_client_photo(uid, photo_path, caption, markup=None):
     try:
         photo = FSInputFile(photo_path)
-        await bot.send_photo(uid, photo, caption=caption, parse_mode="HTML", reply_markup=markup)
+        await bot.send_photo(uid, photo, caption=caption, reply_markup=markup)
     except Exception:
         logging.exception("Send photo failed")
         await send_client(uid, caption, markup)
@@ -283,7 +293,6 @@ async def update_admin_order(uid, markup=None):
             chat_id=u["order_chat_id"],
             message_id=u["order_message_id"],
             caption=order_caption(uid),
-            parse_mode="HTML",
             reply_markup=markup
         )
     except Exception: 
@@ -300,14 +309,13 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
             await bot.edit_message_media(
                 chat_id=u["order_chat_id"],
                 message_id=u["order_message_id"],
-                media=InputMediaPhoto(media=file_id, caption=order_caption(uid), parse_mode="HTML"),
+                media=InputMediaPhoto(media=file_id, caption=order_caption(uid)),
                 reply_markup=markup
             )
         else:
             sent = await bot.send_photo(
                 chat_id, file_id, 
                 caption=order_caption(uid), 
-                parse_mode="HTML", 
                 reply_markup=markup
             )
             u["order_message_id"] = sent.message_id
@@ -350,6 +358,41 @@ async def back_main(c: CallbackQuery):
         "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
         reply_markup=main_kb()
     )
+
+# ⭐ ԿՈԾԱԿՆԵՐԻ ՀԵՆԴԼԵՐՆԵՐԸ
+@dp.callback_query(F.data == "ask_id")
+async def ask_id(c: CallbackQuery):
+    uid = c.from_user.id
+    u = get_user(uid)
+    
+    if not u.get("game_id_waiting"):
+        await c.answer("⚠️ Դուք արդեն մուտքագրել եք ID-ն։")
+        return
+    
+    await c.message.answer(
+        "✏️ Ուղարկիր քո Game ID / Username-ը\n"
+        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
+        reply_markup=back_main_kb()
+    )
+    await c.answer()
+
+@dp.callback_query(F.data == "ask_password")
+async def ask_password(c: CallbackQuery):
+    uid = c.from_user.id
+    u = get_user(uid)
+    
+    if not u.get("game_password_waiting"):
+        await c.answer("⚠️ Դուք արդեն մուտքագրել եք password-ը։")
+        return
+    
+    await c.message.answer(
+        "✏️ Ուղարկիր քո password-ը\n"
+        "Օրինակ՝ `MyPass123`\n\n"
+        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
+        reply_markup=back_main_kb()
+    )
+    await c.answer()
 
 @dp.callback_query(F.data.startswith("game:"))
 async def choose_game(c: CallbackQuery):
@@ -616,10 +659,10 @@ async def photo_input(message: Message):
     await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
     await message.answer(
         "📸 Չեկը ստացվեց: ✅\n\n"
-        "✏️ **ԱՅԺՄ ԳՐԻՐ** քո Game ID / Username-ը\n"
-        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
-        "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
-        reply_markup=back_main_kb()
+        "🎯 ԱՅԺՄ ՄՈՒՏՔԱԳՐԻՐ քո Game ID / Username-ը\n"
+        "📝 Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "👇 Սեղմիր կոճակը և գրիր տեքստը։",
+        reply_markup=ask_id_kb()
     )
 
 @dp.message(F.text)
@@ -684,10 +727,10 @@ async def text_input(message: Message):
         await update_admin_order(uid, admin_password_reject_kb(uid))
         await message.answer(
             "✅ ID-ն ստացվեց: 🆔\n\n"
-            "✏️ **ԱՅԺՄ ԳՐԻՐ** քո password-ը\n"
-            "Օրինակ՝ `MyPass123`\n\n"
-            "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
-            reply_markup=back_main_kb()
+            "🔑 ԱՅԺՄ ՄՈՒՏՔԱԳՐԻՐ քո password-ը\n"
+            "📝 Օրինակ՝ `MyPass123`\n\n"
+            "👇 Սեղմիր կոճակը և գրիր տեքստը։",
+            reply_markup=ask_password_kb()
         )
         return
     
