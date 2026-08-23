@@ -121,7 +121,7 @@ def kb(rows):
 def is_brawl_pass(product):
     return product in BRAWL_PASS_PRICES
 
-# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ
+# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="🎮 Roblox", callback_data="game:roblox"), 
@@ -164,17 +164,6 @@ def back_payment_kb():
 
 def back_main_kb(): 
     return kb([[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]])
-
-# ⭐ ԿՈԾԱԿՆԵՐԸ ID-ի ԵՎ PASSWORD-Ի ՀԱՄԱՐ
-def ask_id_kb():
-    return kb([
-        [InlineKeyboardButton(text="✏️ Գրել ID / Username", callback_data="ask_id")]
-    ])
-
-def ask_password_kb():
-    return kb([
-        [InlineKeyboardButton(text="✏️ Գրել Password", callback_data="ask_password")]
-    ])
 
 def admin_bp_kb(uid, product_name):
     prices = BRAWL_PASS_PRICES[product_name]
@@ -358,41 +347,6 @@ async def back_main(c: CallbackQuery):
         "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
         reply_markup=main_kb()
     )
-
-# ⭐ ԿՈԾԱԿՆԵՐԻ ՀԵՆԴԼԵՐՆԵՐԸ
-@dp.callback_query(F.data == "ask_id")
-async def ask_id(c: CallbackQuery):
-    uid = c.from_user.id
-    u = get_user(uid)
-    
-    if not u.get("game_id_waiting"):
-        await c.answer("⚠️ Դուք արդեն մուտքագրել եք ID-ն։")
-        return
-    
-    await c.message.answer(
-        "✏️ Ուղարկիր քո Game ID / Username-ը\n"
-        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
-        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
-        reply_markup=back_main_kb()
-    )
-    await c.answer()
-
-@dp.callback_query(F.data == "ask_password")
-async def ask_password(c: CallbackQuery):
-    uid = c.from_user.id
-    u = get_user(uid)
-    
-    if not u.get("game_password_waiting"):
-        await c.answer("⚠️ Դուք արդեն մուտքագրել եք password-ը։")
-        return
-    
-    await c.message.answer(
-        "✏️ Ուղարկիր քո password-ը\n"
-        "Օրինակ՝ `MyPass123`\n\n"
-        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
-        reply_markup=back_main_kb()
-    )
-    await c.answer()
 
 @dp.callback_query(F.data.startswith("game:"))
 async def choose_game(c: CallbackQuery):
@@ -659,10 +613,10 @@ async def photo_input(message: Message):
     await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
     await message.answer(
         "📸 Չեկը ստացվեց: ✅\n\n"
-        "🎯 ԱՅԺՄ ՄՈՒՏՔԱԳՐԻՐ քո Game ID / Username-ը\n"
-        "📝 Օրինակ՝ `Player123` կամ `@nick`\n\n"
-        "👇 Սեղմիր կոճակը և գրիր տեքստը։",
-        reply_markup=ask_id_kb()
+        "✏️ **ԱՅԺՄ ԳՐԻՐ** քո Game ID / Username-ը\n"
+        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
+        reply_markup=back_main_kb()
     )
 
 @dp.message(F.text)
@@ -727,10 +681,10 @@ async def text_input(message: Message):
         await update_admin_order(uid, admin_password_reject_kb(uid))
         await message.answer(
             "✅ ID-ն ստացվեց: 🆔\n\n"
-            "🔑 ԱՅԺՄ ՄՈՒՏՔԱԳՐԻՐ քո password-ը\n"
-            "📝 Օրինակ՝ `MyPass123`\n\n"
-            "👇 Սեղմիր կոճակը և գրիր տեքստը։",
-            reply_markup=ask_password_kb()
+            "✏️ **ԱՅԺՄ ԳՐԻՐ** քո password-ը\n"
+            "Օրինակ՝ `MyPass123`\n\n"
+            "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
+            reply_markup=back_main_kb()
         )
         return
     
@@ -845,7 +799,17 @@ async def admin_id_reject(c: CallbackQuery):
     u["game_id"] = None
     u["status"] = "⏳ Սպասվում է նոր ID"
     await save_state()
-    await send_client(uid, "❌ Սխալ ID / Username\n\nՈւղարկիր ճիշտ Game ID / Username-ը։", back_main_kb())
+    
+    # ⭐ ՈՒՂԱՐԿԵԼ ՀՍՏԱԿ ՀԱՐՑՈՒՄ
+    await send_client(
+        uid,
+        "❌ Սխալ ID / Username\n\n"
+        "✏️ **ՈՒՂԱՐԿԻՐ ՃԻՇՏ ID-ն**\n"
+        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
+        back_main_kb()
+    )
+    
     await update_admin_order(uid, admin_id_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր ID")
 
@@ -862,7 +826,17 @@ async def admin_password_reject(c: CallbackQuery):
     u["game_password"] = None
     u["status"] = "⏳ Սպասվում է նոր պասսվորդ"
     await save_state()
-    await send_client(uid, "❌ Սխալ պասսվորդ\n\nՈւղարկիր ճիշտ պասսվորդը։", back_main_kb())
+    
+    # ⭐ ՈՒՂԱՐԿԵԼ ՀՍՏԱԿ ՀԱՐՑՈՒՄ
+    await send_client(
+        uid,
+        "❌ Սխալ պասսվորդ\n\n"
+        "✏️ **ՈՒՂԱՐԿԻՐ ՃԻՇՏ PASSWORD-Ը**\n"
+        "Օրինակ՝ `MyPass123`\n\n"
+        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
+        back_main_kb()
+    )
+    
     await update_admin_order(uid, admin_password_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր պասսվորդ")
 
