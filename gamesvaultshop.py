@@ -6,18 +6,17 @@ import uuid
 from pathlib import Path
 from html import escape
 
-from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, FSInputFile
 
+# ⭐ Telegram Bot Token
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", "")
 SUPPORT_CHANNEL_ID = os.getenv("SUPPORT_CHANNEL_ID", "")
 TELCELL_NUMBER = os.getenv("TELCELL_NUMBER", "043055510")
 CARD_NUMBER = os.getenv("CARD_NUMBER", "")
-PORT = int(os.getenv("PORT", "10000"))
 STATE_FILE = Path(os.getenv("STATE_FILE", "orders_state.json"))
 
 # ⭐ Пути к картинкам для 2FA
@@ -37,6 +36,15 @@ bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 users = {}
 state_lock = asyncio.Lock()
+
+# ⭐ STARTUP - DELETE WEBHOOK
+@dp.startup()
+async def on_startup():
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Webhook deleted successfully")
+    except Exception as e:
+        logging.warning(f"Webhook delete failed: {e}")
 
 # ⭐ Цены для Brawl Pass
 BRAWL_PASS_PRICES = {
@@ -318,15 +326,6 @@ def new_order(u, message):
         u["order_id"] = uuid.uuid4().hex[:8].upper()
     u["username"] = message.from_user.username
     u["is_completed"] = False
-
-# ⭐ STARTUP - DELETE WEBHOOK
-@dp.startup()
-async def on_startup():
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        logging.info("✅ Webhook deleted successfully")
-    except Exception as e:
-        logging.warning(f"Webhook delete failed: {e}")
 
 @dp.message(CommandStart())
 async def start(message: Message):
@@ -809,7 +808,6 @@ async def admin_id_reject(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է նոր ID"
     await save_state()
     
-    # ⭐ ՈՒՂԱՐԿԵԼ ՀՍՏԱԿ ՀԱՐՑՈՒՄ
     await send_client(
         uid,
         "❌ Սխալ ID / Username\n\n"
@@ -836,7 +834,6 @@ async def admin_password_reject(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է նոր պասսվորդ"
     await save_state()
     
-    # ⭐ ՈՒՂԱՐԿԵԼ ՀՍՏԱԿ ՀԱՐՑՈՒՄ
     await send_client(
         uid,
         "❌ Սխալ պասսվորդ\n\n"
@@ -1147,32 +1144,42 @@ async def admin_cmd(message: Message):
     if message.from_user.id == ADMIN_ID:
         await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։")
 
-async def health_handler(request):
-    return web.Response(text="OK")
-
-async def run_web():
-    app = web.Application()
-    app.router.add_get("/", health_handler)
-    app.router.add_get("/health", health_handler)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    logging.info("Health server started on port %s", PORT)
+async def clean_old_orders():
     while True:
-        await asyncio.sleep(3600)
+        await asyncio.sleep(86400)
+        try:
+            now = datetime.datetime.now()
+            deleted = 0
+            for uid in list(users.keys()):
+                u = users[uid]
+                if u.get("is_completed") and u.get("completed_at"):
+                    try:
+                        completed = datetime.datetime.fromisoformat(u["completed_at"])
+                        if (now - completed).days > 30:
+                            base = blank_user()
+                            for key in base:
+                                if key not in ["username", "order_id", "game", "status", "is_completed", "completed_at"]:
+                                    u[key] = base[key]
+                            deleted += 1
+                    except:
+                        pass
+            if deleted > 0:
+                logging.info(f"Cleaned {deleted} old orders")
+                await save_state()
+        except Exception as e:
+            logging.exception(f"Clean old orders error: {e}")
+
+async def save_bans():
+    pass  # Եթե չկա banned_users.json-ի ֆունկցիա, պարզապես բաց ենք թողնում
 
 async def main():
     load_state()
     await save_bans()
     asyncio.create_task(clean_old_orders())
-    await asyncio.gather(
-        dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types()),
-        run_web()
-    )
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        pass
+        logging.info("Bot stopped")
