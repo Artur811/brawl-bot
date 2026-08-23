@@ -319,6 +319,15 @@ def new_order(u, message):
     u["username"] = message.from_user.username
     u["is_completed"] = False
 
+# ⭐ STARTUP - DELETE WEBHOOK
+@dp.startup()
+async def on_startup():
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Webhook deleted successfully")
+    except Exception as e:
+        logging.warning(f"Webhook delete failed: {e}")
+
 @dp.message(CommandStart())
 async def start(message: Message):
     u = get_user(message.from_user.id)
@@ -1155,6 +1164,8 @@ async def run_web():
 
 async def main():
     load_state()
+    await save_bans()
+    asyncio.create_task(clean_old_orders())
     await asyncio.gather(
         dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types()),
         run_web()
