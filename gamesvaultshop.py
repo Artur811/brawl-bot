@@ -312,7 +312,7 @@ def order_caption(uid):
             f"🎮 Խաղ: {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
             f"📦 Ապրանք: {escape(str(u.get('product') or '—'))}\n"
             f"💰 Գին: {price} ֏\n"
-            f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
+            f"💳 Վճարում: {escape(str(u.get('payment') or '--'))}\n"
             f"🎯 Game ID / Username: {escape(str(u.get('game_id') or '—'))}\n"
             f"🔑 Պասսվորդ: {escape(str(u.get('game_password') or '—'))}\n"
             f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
