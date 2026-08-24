@@ -53,7 +53,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ⭐ ԲՈՏԻ ՍՏԵՂԾՈՒՄ
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -70,11 +69,11 @@ order_stats = defaultdict(int)
 async def on_startup():
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("✅ Webhook deleted successfully")
+        logger.info("✅ Webhook deleted")
     except Exception as e:
         logger.warning(f"Webhook delete failed: {e}")
 
-# ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
+# ⭐ ԽԱՂԵՐ
 GAME_EMOJIS = {
     "roblox": "🎮",
     "standoff2": "🔫",
@@ -83,7 +82,6 @@ GAME_EMOJIS = {
     "fcmobile": "⚽"
 }
 
-# ⭐ BRAWL PASS-Ի ԳՆԵՐԸ
 BRAWL_PASS_PRICES = {
     "Brawl Pass": {"low": 2500, "high": 3400},
     "Brawl Pass+": {"low": 3400, "high": 4800}
@@ -99,37 +97,20 @@ CATALOG = {
 
 def blank_user():
     return {
-        "game": None,
-        "product": None,
-        "price": None,
-        "payment": None,
-        "username": None,
-        "order_id": None,
-        "game_id": None,
-        "game_password": None,
-        "receipt_file_id": None,
-        "receipt_waiting": False,
-        "game_id_waiting": False,
-        "game_password_waiting": False,
+        "game": None, "product": None, "price": None, "payment": None,
+        "username": None, "order_id": None, "game_id": None, "game_password": None,
+        "receipt_file_id": None, "receipt_waiting": False,
+        "game_id_waiting": False, "game_password_waiting": False,
         "receipt_accepted": False,
-        "verification_type": None,
-        "verification_done": False,
-        "verification_code_waiting": False,
-        "verification_attempts": 0,
-        "order_message_id": None,
-        "order_chat_id": None,
-        "support_waiting": False,
-        "refund_waiting": False,
-        "refund_method": None,
-        "refund_details": None,
-        "status": "🆕 Նոր պատվեր",
-        "is_completed": False,
-        "created_at": datetime.datetime.now().isoformat(),
-        "completed_at": None,
-        "brawl_pass_waiting": False,
-        "brawl_pass_screenshot_file_id": None,
-        "brawl_pass_price_selected": False,
-        "brawl_pass_product": None,
+        "verification_type": None, "verification_done": False,
+        "verification_code_waiting": False, "verification_attempts": 0,
+        "order_message_id": None, "order_chat_id": None,
+        "support_waiting": False, "refund_waiting": False,
+        "refund_method": None, "refund_details": None,
+        "status": "🆕 Նոր պատվեր", "is_completed": False,
+        "created_at": datetime.datetime.now().isoformat(), "completed_at": None,
+        "brawl_pass_waiting": False, "brawl_pass_screenshot_file_id": None,
+        "brawl_pass_price_selected": False, "brawl_pass_product": None,
         "brawl_pass_rejected": False,
     }
 
@@ -155,13 +136,11 @@ def load_state():
                     if key not in users[uid]:
                         users[uid][key] = base[key]
     except Exception:
-        logger.exception("State load failed")
         users = {}
-    
     try:
         if BAN_FILE.exists():
             banned_users = set(json.loads(BAN_FILE.read_text("utf-8")))
-    except Exception:
+    except:
         banned_users = set()
 
 async def save_state():
@@ -185,7 +164,7 @@ def is_brawl_pass(product):
 def get_game_emoji(game):
     return GAME_EMOJIS.get(game, "🎮")
 
-# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
+# ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ
 def main_kb():
     return kb([
         [InlineKeyboardButton(text="🎮 Roblox", callback_data="game:roblox"), 
@@ -283,6 +262,7 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
+# ⭐ ORDER_CAPTION - ՈՒՂՂՎԱԾ
 def order_caption(uid):
     u = get_user(uid)
     
@@ -306,14 +286,16 @@ def order_caption(uid):
     elif u.get("verification_code_waiting"):
         verify_status = " (⏳ Սպասվում է 2FA կոդ)"
     
+    game_id = u.get("game_id") or "—"
+    
     return (f"🧾 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
-            f"👤 ID: {uid}\n"
-            f"🔹 Username: @{escape(str(u.get('username') or 'չկա'))}\n"
+            f"👤 Telegram ID: {uid}\n"
+            f"🔹 Telegram Username: @{escape(str(u.get('username') or 'չկա'))}\n"
             f"🎮 Խաղ: {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
             f"📦 Ապրանք: {escape(str(u.get('product') or '—'))}\n"
             f"💰 Գին: {price} ֏\n"
             f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
-            f"🎯 Game ID / Username: {escape(str(u.get('game_id') or '—'))}\n"
+            f"🎯 Game ID / Username: {escape(str(game_id))}\n"
             f"🔑 Պասսվորդ: {escape(str(u.get('game_password') or '—'))}\n"
             f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
 
@@ -377,10 +359,18 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
         logger.exception("Could not create/replace admin order")
     await save_state()
 
-def new_order(u, message):
-    if not u.get("order_id"): 
+# ⭐ NEW_ORDER - ՈՒՂՂՎԱԾ
+def new_order(u, user):
+    if not u.get("order_id"):
         u["order_id"] = uuid.uuid4().hex[:8].upper()
-    u["username"] = message.from_user.username
+    
+    # ⭐ ՎԵՐՑՆԵԼ ԿԼԻԵՆՏԻ ՏՎՅԱԼՆԵՐԸ
+    if hasattr(user, "from_user"):
+        tg_user = user.from_user
+    else:
+        tg_user = user
+    
+    u["username"] = tg_user.username
     u["is_completed"] = False
     u["created_at"] = datetime.datetime.now().isoformat()
 
@@ -415,7 +405,7 @@ async def clean_old_orders():
         except Exception as e:
             logger.exception(f"Clean old orders error: {e}")
 
-# ⭐ HEALTH CHECK SERVER FOR RAILWAY
+# ⭐ HEALTH CHECK SERVER
 async def health_handler(request):
     return web.Response(text="OK")
 
@@ -503,6 +493,7 @@ async def back_game(c: CallbackQuery):
         reply_markup=game_kb(game)
     )
 
+# ⭐ CHOOSE_PRODUCT - ՈՒՂՂՎԱԾ
 @dp.callback_query(F.data.startswith("product:"))
 async def choose_product(c: CallbackQuery):
     _, game, idx = c.data.split(":")
@@ -538,7 +529,7 @@ async def choose_product(c: CallbackQuery):
             verification_attempts=0,
             is_completed=False
         )
-        new_order(u, c.message)
+        new_order(u, c.from_user)  # ⭐ ՈՒՂՂՎԱԾ
         await save_state()
         await safe_answer(c)
         
@@ -644,7 +635,7 @@ async def payment_card(c: CallbackQuery):
     u["payment"] = "Քարտ"
     u["receipt_waiting"] = True
     u["status"] = "⏳ Սպասվում է վճարման screenshot"
-    new_order(u, c.message)
+    new_order(u, c.from_user)  # ⭐ ՈՒՂՂՎԱԾ
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
@@ -652,6 +643,7 @@ async def payment_card(c: CallbackQuery):
         reply_markup=back_payment_kb()
     )
 
+# ⭐ PAYMENT_TELCELL - ՈՒՂՂՎԱԾ
 @dp.callback_query(F.data == "payment:telcell")
 async def payment_telcell(c: CallbackQuery):
     uid = c.from_user.id
@@ -662,7 +654,7 @@ async def payment_telcell(c: CallbackQuery):
     u["payment"] = "Telcell"
     u["receipt_waiting"] = True
     u["status"] = "⏳ Սպասվում է վճարման screenshot"
-    new_order(u, c.message)
+    new_order(u, c.from_user)  # ⭐ ՈՒՂՂՎԱԾ
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
@@ -692,6 +684,7 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
+# ⭐ PHOTO_INPUT - ՈՒՂՂՎԱԾ
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
@@ -704,7 +697,7 @@ async def photo_input(message: Message):
         u["brawl_pass_waiting"] = False
         u["brawl_pass_rejected"] = False
         u["status"] = f"⏳ Սպասվում է ադմինի կողմից {product_name} գնի ընտրություն"
-        new_order(u, message)
+        new_order(u, message.from_user)  # ⭐ ՈՒՂՂՎԱԾ
         
         await create_or_replace_order(uid, file_id, admin_bp_kb(uid, product_name))
         
@@ -743,13 +736,13 @@ async def photo_input(message: Message):
     u["status"] = "⏳ Սպասվում է ID"
     u["game_id_waiting"] = True
     u["receipt_waiting"] = False
-    new_order(u, message)
+    new_order(u, message.from_user)  # ⭐ ՈՒՂՂՎԱԾ
     
     await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
     await message.answer(
         "📸 Չեկը ստացվեց: ✅\n\n"
-        "✏️ **ԱՅԺՄ ԳՐԻՐ** քո Game ID / Username-ը\n"
-        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "✏️ ԱՅԺՄ ԳՐԻՐ քո Game ID / Username-ը\n"
+        "Օրինակ՝ Player123 կամ @nick\n\n"
         "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
         reply_markup=back_main_kb()
     )
@@ -816,8 +809,8 @@ async def text_input(message: Message):
         await update_admin_order(uid, admin_password_reject_kb(uid))
         await message.answer(
             "✅ ID-ն ստացվեց: 🆔\n\n"
-            "✏️ **ԱՅԺՄ ԳՐԻՐ** քո password-ը\n"
-            "Օրինակ՝ `MyPass123`\n\n"
+            "✏️ ԱՅԺՄ ԳՐԻՐ քո password-ը\n"
+            "Օրինակ՝ MyPass123\n\n"
             "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
             reply_markup=back_main_kb()
         )
@@ -938,8 +931,8 @@ async def admin_id_reject(c: CallbackQuery):
     await send_client(
         uid,
         "❌ Սխալ ID / Username\n\n"
-        "✏️ **ՈՒՂԱՐԿԻՐ ՃԻՇՏ ID-ն**\n"
-        "Օրինակ՝ `Player123` կամ `@nick`\n\n"
+        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ ID-ն\n"
+        "Օրինակ՝ Player123 կամ @nick\n\n"
         "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
         back_main_kb()
     )
@@ -964,8 +957,8 @@ async def admin_password_reject(c: CallbackQuery):
     await send_client(
         uid,
         "❌ Սխալ պասսվորդ\n\n"
-        "✏️ **ՈՒՂԱՐԿԻՐ ՃԻՇՏ PASSWORD-Ը**\n"
-        "Օրինակ՝ `MyPass123`\n\n"
+        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ PASSWORD-Ը\n"
+        "Օրինակ՝ MyPass123\n\n"
         "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
         back_main_kb()
     )
