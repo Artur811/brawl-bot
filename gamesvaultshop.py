@@ -3,23 +3,34 @@ import asyncio
 import json
 import logging
 import uuid
+import datetime
 from pathlib import Path
 from html import escape
+from collections import defaultdict
 
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, FSInputFile
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardButton,
+    InlineKeyboardMarkup, InputMediaPhoto, FSInputFile
+)
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 
-# ⭐ Telegram Bot Token
+# ⭐ ՆԱՍՏԱՏՈՒՄՆԵՐ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", "")
 SUPPORT_CHANNEL_ID = os.getenv("SUPPORT_CHANNEL_ID", "")
 TELCELL_NUMBER = os.getenv("TELCELL_NUMBER", "043055510")
 CARD_NUMBER = os.getenv("CARD_NUMBER", "")
+PORT = int(os.getenv("PORT", "8080"))
 STATE_FILE = Path(os.getenv("STATE_FILE", "orders_state.json"))
+LOG_FILE = Path("bot.log")
+BAN_FILE = Path("banned_users.json")
 
-# ⭐ Пути к картинкам для 2FA
+# ⭐ 2FA-ի նկարների հասցեները
 VERIFY_IMAGES = {
     "device": "images/2fa_device.jpg",
     "auth": "images/2fa_auth.jpg",
@@ -31,33 +42,59 @@ if not BOT_TOKEN:
 if not ADMIN_ID:
     raise RuntimeError("ADMIN_ID չգտնվեց։")
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-bot = Bot(BOT_TOKEN)
+# ⭐ ԼՈԳԱՎՈՐՈՒՄ
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# ⭐ ԲՈՏԻ ՍՏԵՂԾՈՒՄ
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher()
+
 users = {}
+banned_users = set()
 state_lock = asyncio.Lock()
+order_stats = defaultdict(int)
 
 # ⭐ STARTUP - DELETE WEBHOOK
 @dp.startup()
 async def on_startup():
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-        logging.info("✅ Webhook deleted successfully")
+        logger.info("✅ Webhook deleted successfully")
     except Exception as e:
-        logging.warning(f"Webhook delete failed: {e}")
+        logger.warning(f"Webhook delete failed: {e}")
 
-# ⭐ Цены для Brawl Pass
+# ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
+GAME_EMOJIS = {
+    "roblox": "🎮",
+    "standoff2": "🔫",
+    "brawlstars": "⭐",
+    "pubg": "🪂",
+    "fcmobile": "⚽"
+}
+
+# ⭐ BRAWL PASS-Ի ԳՆԵՐԸ
 BRAWL_PASS_PRICES = {
     "Brawl Pass": {"low": 2500, "high": 3400},
     "Brawl Pass+": {"low": 3400, "high": 4800}
 }
 
 CATALOG = {
-    "roblox": {"name": "🎮 Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
-    "standoff2": {"name": "🔫 Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
-    "brawlstars": {"name": "⭐ Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
-    "pubg": {"name": "🪂 PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
-    "fcmobile": {"name": "⚽ FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
+    "roblox": {"name": "Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
+    "standoff2": {"name": "Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
+    "brawlstars": {"name": "Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
+    "pubg": {"name": "PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
+    "fcmobile": {"name": "FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
 }
 
 def blank_user():
@@ -87,6 +124,8 @@ def blank_user():
         "refund_details": None,
         "status": "🆕 Նոր պատվեր",
         "is_completed": False,
+        "created_at": datetime.datetime.now().isoformat(),
+        "completed_at": None,
         "brawl_pass_waiting": False,
         "brawl_pass_screenshot_file_id": None,
         "brawl_pass_price_selected": False,
@@ -105,20 +144,34 @@ def get_user(uid):
     return users[uid]
 
 def load_state():
-    global users
+    global users, banned_users
     try:
         if STATE_FILE.exists():
             raw = json.loads(STATE_FILE.read_text("utf-8"))
             users = {int(k): v for k, v in raw.items()}
+            for uid in users:
+                base = blank_user()
+                for key in base:
+                    if key not in users[uid]:
+                        users[uid][key] = base[key]
     except Exception:
-        logging.exception("State load failed")
+        logger.exception("State load failed")
         users = {}
+    
+    try:
+        if BAN_FILE.exists():
+            banned_users = set(json.loads(BAN_FILE.read_text("utf-8")))
+    except Exception:
+        banned_users = set()
 
 async def save_state():
     async with state_lock:
         tmp = STATE_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(users, ensure_ascii=False), encoding="utf-8")
         tmp.replace(STATE_FILE)
+
+async def save_bans():
+    BAN_FILE.write_text(json.dumps(list(banned_users)), encoding="utf-8")
 
 def fmt(n): 
     return f"{int(n):,}".replace(",", " ")
@@ -128,6 +181,9 @@ def kb(rows):
 
 def is_brawl_pass(product):
     return product in BRAWL_PASS_PRICES
+
+def get_game_emoji(game):
+    return GAME_EMOJIS.get(game, "🎮")
 
 # ⭐ ԿԼԱՎԻԱՏՈՒՐԱՆԵՐ (առանց «Չեղարկել» կոճակի)
 def main_kb():
@@ -271,14 +327,14 @@ async def send_client(uid, text, markup=None):
     try: 
         await bot.send_message(uid, text, reply_markup=markup)
     except Exception: 
-        logging.exception("Client message failed")
+        logger.exception("Client message failed")
 
 async def send_client_photo(uid, photo_path, caption, markup=None):
     try:
         photo = FSInputFile(photo_path)
         await bot.send_photo(uid, photo, caption=caption, reply_markup=markup)
     except Exception:
-        logging.exception("Send photo failed")
+        logger.exception("Send photo failed")
         await send_client(uid, caption, markup)
 
 async def update_admin_order(uid, markup=None):
@@ -293,7 +349,7 @@ async def update_admin_order(uid, markup=None):
             reply_markup=markup
         )
     except Exception: 
-        logging.exception("Could not update admin order")
+        logger.exception("Could not update admin order")
 
 async def create_or_replace_order(uid, file_id=None, markup=None):
     u = get_user(uid)
@@ -318,7 +374,7 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
             u["order_message_id"] = sent.message_id
             u["order_chat_id"] = chat_id
     except Exception: 
-        logging.exception("Could not create/replace admin order")
+        logger.exception("Could not create/replace admin order")
     await save_state()
 
 def new_order(u, message):
@@ -326,10 +382,63 @@ def new_order(u, message):
         u["order_id"] = uuid.uuid4().hex[:8].upper()
     u["username"] = message.from_user.username
     u["is_completed"] = False
+    u["created_at"] = datetime.datetime.now().isoformat()
 
+async def check_banned(uid):
+    if uid in banned_users:
+        await bot.send_message(uid, "🚫 <b>Ձեզ արգելված է օգտվել բոտից</b>\n\nԿապվեք ադմինի հետ։")
+        return True
+    return False
+
+async def clean_old_orders():
+    while True:
+        await asyncio.sleep(86400)
+        try:
+            now = datetime.datetime.now()
+            deleted = 0
+            for uid in list(users.keys()):
+                u = users[uid]
+                if u.get("is_completed") and u.get("completed_at"):
+                    try:
+                        completed = datetime.datetime.fromisoformat(u["completed_at"])
+                        if (now - completed).days > 30:
+                            base = blank_user()
+                            for key in base:
+                                if key not in ["username", "order_id", "game", "status", "is_completed", "completed_at"]:
+                                    u[key] = base[key]
+                            deleted += 1
+                    except:
+                        pass
+            if deleted > 0:
+                logger.info(f"Cleaned {deleted} old orders")
+                await save_state()
+        except Exception as e:
+            logger.exception(f"Clean old orders error: {e}")
+
+# ⭐ HEALTH CHECK SERVER FOR RAILWAY
+async def health_handler(request):
+    return web.Response(text="OK")
+
+async def run_web():
+    app = web.Application()
+    app.router.add_get("/", health_handler)
+    app.router.add_get("/health", health_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    logger.info("✅ Health server started on port %s", PORT)
+    while True:
+        await asyncio.sleep(3600)
+
+# ⭐ ՀԵՆԴԼԵՐՆԵՐ
 @dp.message(CommandStart())
 async def start(message: Message):
-    u = get_user(message.from_user.id)
+    uid = message.from_user.id
+    if await check_banned(uid):
+        return
+    
+    u = get_user(uid)
     u.clear()
     u.update(blank_user())
     u["username"] = message.from_user.username
@@ -340,8 +449,12 @@ async def start(message: Message):
     )
 
 @dp.message(Command("cancel"))
-async def cancel(message: Message):
-    u = get_user(message.from_user.id)
+async def cancel_command(message: Message):
+    uid = message.from_user.id
+    if await check_banned(uid):
+        return
+    
+    u = get_user(uid)
     u.clear()
     u.update(blank_user())
     u["username"] = message.from_user.username
@@ -350,6 +463,9 @@ async def cancel(message: Message):
 
 @dp.callback_query(F.data == "back:main")
 async def back_main(c: CallbackQuery):
+    uid = c.from_user.id
+    if await check_banned(uid):
+        return
     await safe_answer(c)
     await c.message.edit_text(
         "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
@@ -358,10 +474,14 @@ async def back_main(c: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("game:"))
 async def choose_game(c: CallbackQuery):
+    uid = c.from_user.id
+    if await check_banned(uid):
+        return
+    
     game = c.data.split(":", 1)[1]
     if game not in CATALOG:
         return
-    u = get_user(c.from_user.id)
+    u = get_user(uid)
     u["game"] = game
     u["product"] = None
     u["price"] = None
@@ -404,7 +524,7 @@ async def choose_product(c: CallbackQuery):
             brawl_pass_screenshot_file_id=None,
             brawl_pass_price_selected=False,
             brawl_pass_rejected=False,
-            status="⏳ Սպասվում է Brawl Pass screenshot",
+            status=f"⏳ Սպասվում է {name} screenshot",
             game_id=None,
             game_password=None,
             receipt_file_id=None,
@@ -509,7 +629,9 @@ async def back_product(c: CallbackQuery):
 
 @dp.callback_query(F.data == "payment:card")
 async def payment_card(c: CallbackQuery):
-    u = get_user(c.from_user.id)
+    uid = c.from_user.id
+    if await check_banned(uid):
+        return
     
     if not CARD_NUMBER:
         await c.answer(
@@ -518,6 +640,7 @@ async def payment_card(c: CallbackQuery):
         )
         return
     
+    u = get_user(uid)
     u["payment"] = "Քարտ"
     u["receipt_waiting"] = True
     u["status"] = "⏳ Սպասվում է վճարման screenshot"
@@ -531,7 +654,11 @@ async def payment_card(c: CallbackQuery):
 
 @dp.callback_query(F.data == "payment:telcell")
 async def payment_telcell(c: CallbackQuery):
-    u = get_user(c.from_user.id)
+    uid = c.from_user.id
+    if await check_banned(uid):
+        return
+    
+    u = get_user(uid)
     u["payment"] = "Telcell"
     u["receipt_waiting"] = True
     u["status"] = "⏳ Սպասվում է վճարման screenshot"
@@ -890,6 +1017,12 @@ async def order_complete(c: CallbackQuery):
     
     u["status"] = "✅ Դոնատը հաստատված է"
     u["is_completed"] = True
+    u["completed_at"] = datetime.datetime.now().isoformat()
+    
+    game = u.get("game")
+    username = u.get("username")
+    order_id = u.get("order_id")
+    
     u["product"] = None
     u["price"] = None
     u["payment"] = None
@@ -937,6 +1070,12 @@ async def refund_action(c: CallbackQuery):
     u["refund_method"] = method
     u["status"] = "💸 Վերադարձ"
     u["is_completed"] = True
+    u["completed_at"] = datetime.datetime.now().isoformat()
+    
+    game = u.get("game")
+    username = u.get("username")
+    order_id = u.get("order_id")
+    
     u["product"] = None
     u["price"] = None
     u["payment"] = None
@@ -1144,42 +1283,17 @@ async def admin_cmd(message: Message):
     if message.from_user.id == ADMIN_ID:
         await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։")
 
-async def clean_old_orders():
-    while True:
-        await asyncio.sleep(86400)
-        try:
-            now = datetime.datetime.now()
-            deleted = 0
-            for uid in list(users.keys()):
-                u = users[uid]
-                if u.get("is_completed") and u.get("completed_at"):
-                    try:
-                        completed = datetime.datetime.fromisoformat(u["completed_at"])
-                        if (now - completed).days > 30:
-                            base = blank_user()
-                            for key in base:
-                                if key not in ["username", "order_id", "game", "status", "is_completed", "completed_at"]:
-                                    u[key] = base[key]
-                            deleted += 1
-                    except:
-                        pass
-            if deleted > 0:
-                logging.info(f"Cleaned {deleted} old orders")
-                await save_state()
-        except Exception as e:
-            logging.exception(f"Clean old orders error: {e}")
-
-async def save_bans():
-    pass  # Եթե չկա banned_users.json-ի ֆունկցիա, պարզապես բաց ենք թողնում
-
 async def main():
     load_state()
     await save_bans()
     asyncio.create_task(clean_old_orders())
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    await asyncio.gather(
+        dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types()),
+        run_web()
+    )
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Bot stopped")
+        logger.info("Bot stopped")
