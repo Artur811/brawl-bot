@@ -220,6 +220,7 @@ def admin_bp_kb(uid, product_name):
                             callback_data=f"bpreject:{uid}")]
     ])
 
+# ⭐ ID REJECT KB - ՈՒՂՂՎԱԾ
 def admin_id_reject_kb(uid):
     return kb([
         [
@@ -266,7 +267,7 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
-# ⭐ ORDER_CAPTION
+# ⭐ ORDER_CAPTION - ՈՒՂՂՎԱԾ
 def order_caption(uid):
     u = get_user(uid)
     
@@ -685,6 +686,7 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
+# ⭐ PHOTO_INPUT - ՈՒՂՂՎԱԾ ID/Username-ով
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
@@ -731,6 +733,7 @@ async def photo_input(message: Message):
         )
         return
     
+    # ⭐ ՍԱ ՀԻՄՆԱԿԱՆ ՄԱՍՆ Է - ID/Username-ի հարցում
     u["receipt_file_id"] = file_id
     u["receipt_accepted"] = False
     u["status"] = "⏳ Սպասվում է ID"
@@ -747,7 +750,7 @@ async def photo_input(message: Message):
         reply_markup=back_main_kb()
     )
 
-# ⭐ TEXT_INPUT - ԱՄԲՈՂՋԱԿԱՆ ՈՒՂՂՎԱԾ
+# ⭐ TEXT_INPUT - ՈՒՂՂՎԱԾ ID/Username-ով
 @dp.message(F.text)
 async def text_input(message: Message):
     uid = message.from_user.id
@@ -812,11 +815,14 @@ async def text_input(message: Message):
             )
             return
 
+        # ⭐ ՊԱՀՊԱՆԵԼ ID/Username-ը
         u["game_id"] = text
         u["game_id_waiting"] = False
         u["status"] = "⏳ ID / Username-ը ստացվեց"
 
         await save_state()
+        
+        # ⭐ ԹԱՐՄԱՑՆԵԼ ԱԴՄԻՆԻ ԶԱՆՂԸ (ՊԱՐՈԼԻ ՍՊԱՍՄԱՆ ՀԱՄԱՐ)
         await update_admin_order(uid, admin_password_reject_kb(uid))
 
         await message.answer(
@@ -926,6 +932,7 @@ async def bp_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
+# ⭐ ADMIN ID REJECT - ՈՒՂՂՎԱԾ
 @dp.callback_query(F.data.startswith("id:reject:"))
 async def admin_id_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -935,12 +942,14 @@ async def admin_id_reject(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
 
+    # ⭐ ԶՐՈՅԱՑՆԵԼ ID-ն ԵՎ ԿՐԿԻՆ ՍՊԱՍԵԼ
     u["game_id"] = None
     u["game_id_waiting"] = True
     u["status"] = "⏳ Սպասվում է նոր ID / Username"
 
     await save_state()
 
+    # ⭐ ԿԼԻԵՆՏԻՆ ՈՒՂԱՐԿԵԼ ՀԱՐՑՈՒՄ
     await send_client(
         uid,
         "❌ Սխալ ID / Username\n\n"
@@ -949,6 +958,7 @@ async def admin_id_reject(c: CallbackQuery):
         back_main_kb()
     )
 
+    # ⭐ ԹԱՐՄԱՑՆԵԼ ԱԴՄԻՆԻ ԶԱՆՂԸ
     await update_admin_order(uid, admin_id_reject_kb(uid))
     await safe_answer(c, "⏳ Սպասվում է նոր ID / Username")
 
