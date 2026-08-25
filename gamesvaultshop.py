@@ -72,7 +72,7 @@ async def on_startup():
     except Exception as e:
         logger.warning(f"Webhook delete failed: {e}")
 
-# ⭐ ԽԱՂԵՐ
+# ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
 GAME_EMOJIS = {
     "roblox": "🎮",
     "standoff2": "🔫",
@@ -81,17 +81,19 @@ GAME_EMOJIS = {
     "fcmobile": "⚽"
 }
 
+# ⭐ BRAWL PASS-Ի ԳՆԵՐ
 BRAWL_PASS_PRICES = {
     "Brawl Pass": {"low": 2500, "high": 3400},
     "Brawl Pass+": {"low": 3400, "high": 4800}
 }
 
+# ⭐ ԿԱՏԱԼՈԳ - ԲՈԼՈՐ ԽԱՂԵՐԸ
 CATALOG = {
-    "roblox": {"name": "🎮 Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
-    "standoff2": {"name": "🔫 Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
-    "brawlstars": {"name": "⭐ Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
-    "pubg": {"name": "🪂 PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
-    "fcmobile": {"name": "⚽ FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
+    "roblox": {"name": "Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
+    "standoff2": {"name": "Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
+    "brawlstars": {"name": "Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
+    "pubg": {"name": "PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
+    "fcmobile": {"name": "FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
 }
 
 def blank_user():
@@ -207,6 +209,7 @@ def back_payment_kb():
 def back_main_kb(): 
     return kb([[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]])
 
+# ⭐ ԱԴՄԻՆԻ ԿՈՃԱԿՆԵՐ
 def admin_bp_kb(uid, product_name):
     prices = BRAWL_PASS_PRICES[product_name]
     return kb([
@@ -277,7 +280,6 @@ def admin_refund_kb(uid):
 def order_caption(uid):
     u = get_user(uid)
     
-    # ⭐ ԱՎԱՐՏՎԱԾ ՊԱՏՎԵՐ
     if u.get("is_completed"):
         return (f"✅ Պատվերը ավարտված է\n\n"
                 f"📦 Պատվեր՝ #{escape(str(u.get('order_id') or '—'))}\n"
@@ -286,7 +288,6 @@ def order_caption(uid):
                 f"💰 Գին՝ {fmt(u.get('price') or 0)} ֏\n\n"
                 f"📌 Կարգավիճակ՝ ✅ Ավարտված")
     
-    # ⭐ ԱԿՏԻՎ ՊԱՏՎԵՐ
     price = fmt(u.get("price") or 0) if u.get("price") else "Ադմինը դեռ չի ընտրել"
     game_id = u.get("game_id") or "—"
     game_password = u.get("game_password") or "—"
@@ -310,14 +311,14 @@ async def safe_answer(c, text=None):
 
 async def send_client(uid, text, markup=None):
     try: 
-        await bot.send_message(uid, text, markup=markup)
+        await bot.send_message(uid, text, reply_markup=markup)
     except Exception: 
         logger.exception("Client message failed")
 
 async def send_client_photo(uid, photo_path, caption, markup=None):
     try:
         photo = FSInputFile(photo_path)
-        await bot.send_photo(uid, photo, caption=caption, markup=markup)
+        await bot.send_photo(uid, photo, caption=caption, reply_markup=markup)
     except Exception:
         logger.exception("Send photo failed")
         await send_client(uid, caption, markup)
@@ -331,7 +332,7 @@ async def update_admin_order(uid, markup=None):
             chat_id=u["order_chat_id"],
             message_id=u["order_message_id"],
             caption=order_caption(uid),
-            markup=markup
+            reply_markup=markup
         )
     except Exception: 
         logger.exception("Could not update admin order")
@@ -348,13 +349,13 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
                 chat_id=u["order_chat_id"],
                 message_id=u["order_message_id"],
                 media=InputMediaPhoto(media=file_id, caption=order_caption(uid)),
-                markup=markup
+                reply_markup=markup
             )
         else:
             sent = await bot.send_photo(
                 chat_id, file_id, 
                 caption=order_caption(uid), 
-                markup=markup
+                reply_markup=markup
             )
             u["order_message_id"] = sent.message_id
             u["order_chat_id"] = chat_id
@@ -436,7 +437,7 @@ async def start(message: Message):
     await save_state()
     await message.answer(
         "💎 Games Vault Shop\n\nԸնտրիր խաղը և ստացիր քո թվային ապրանքը արագ ու անվտանգ։",
-        markup=main_kb()
+        reply_markup=main_kb()
     )
 
 @dp.message(Command("cancel"))
@@ -450,7 +451,7 @@ async def cancel_command(message: Message):
     u.update(blank_user())
     u["username"] = message.from_user.username
     await save_state()
-    await message.answer("❌ Պատվերը չեղարկվեց։", markup=main_kb())
+    await message.answer("❌ Պատվերը չեղարկվեց։", reply_markup=main_kb())
 
 @dp.callback_query(F.data == "back:main")
 async def back_main(c: CallbackQuery):
@@ -460,7 +461,7 @@ async def back_main(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "💎 Games Vault Shop\n\nԸնտրիր խաղը։",
-        markup=main_kb()
+        reply_markup=main_kb()
     )
 
 @dp.callback_query(F.data.startswith("game:"))
@@ -479,8 +480,8 @@ async def choose_game(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        markup=game_kb(game)
+        f"{GAME_EMOJIS.get(game, '🎮')} {CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
+        reply_markup=game_kb(game)
     )
 
 @dp.callback_query(F.data.startswith("back:game:"))
@@ -491,7 +492,7 @@ async def back_game(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"{CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
-        markup=game_kb(game)
+        reply_markup=game_kb(game)
     )
 
 @dp.callback_query(F.data.startswith("product:"))
@@ -538,7 +539,7 @@ async def choose_product(c: CallbackQuery):
             f"Ուղարկիր screenshot-ը, որտեղ հստակ երևում է, որ քո հաշվում {escape(name)} է։\n\n"
             f"⚠️ Screenshot-ը պետք է լինի ամբողջական և լավ տեսանելի։\n\n"
             f"Ադմինը screenshot-ը ստուգելուց հետո ինքը կընտրի ճիշտ գինը։",
-            markup=back_main_kb()
+            reply_markup=back_main_kb()
         )
         return
     
@@ -568,7 +569,7 @@ async def choose_product(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"📦 {escape(name)}\n\n💰 Գին՝ {fmt(price)} ֏\n\nՇարունակե՞նք գնումը։",
-        markup=product_kb(game)
+        reply_markup=product_kb(game)
     )
 
 @dp.callback_query(F.data == "buy:confirm")
@@ -587,7 +588,7 @@ async def buy_confirm(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"💳 Վճարման եղանակ\n\nՊատվեր՝ {escape(u['product'])}\nԳին՝ {fmt(u['price'])} ֏",
-        markup=payment_kb()
+        reply_markup=payment_kb()
     )
 
 @dp.callback_query(F.data == "back:product")
@@ -599,13 +600,13 @@ async def back_product(c: CallbackQuery):
             await safe_answer(c)
             await c.message.edit_text(
                 f"📦 {escape(u['product'])}\n\n💰 Գինը ընտրված է՝ {fmt(u.get('price'))} ֏\n\nՇարունակե՞նք գնումը։",
-                markup=product_kb(u['game'])
+                reply_markup=product_kb(u['game'])
             )
         else:
             await safe_answer(c)
             await c.message.edit_text(
                 f"📸 {escape(u['product'])}\n\n⏳ Սպասում ենք ադմինի կողմից գնի ընտրությանը։",
-                markup=back_main_kb()
+                reply_markup=back_main_kb()
             )
         return
     
@@ -615,7 +616,7 @@ async def back_product(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"📦 {escape(u['product'])}\n\n💰 Գին՝ {fmt(u.get('price') or 0)} ֏",
-        markup=product_kb(u['game'])
+        reply_markup=product_kb(u['game'])
     )
 
 @dp.callback_query(F.data == "payment:card")
@@ -640,7 +641,7 @@ async def payment_card(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         f"💳 Քարտով վճարում\n\nՔարտ՝ {escape(CARD_NUMBER)}\nԳումար՝ {fmt(u['price'])} ֏\n\nՎճարումից հետո ուղարկիր screenshot-ը։",
-        markup=back_payment_kb()
+        reply_markup=back_payment_kb()
     )
 
 @dp.callback_query(F.data == "payment:telcell")
@@ -672,7 +673,7 @@ async def payment_telcell(c: CallbackQuery):
         f"✅ Screenshot-ը ստանալուց հետո կհաստատենք պատվերը։\n\n"
         f"Games Vault Shop 🎮\n"
         f"Արագ ու անվտանգ գնումներ։ 💎",
-        markup=back_payment_kb()
+        reply_markup=back_payment_kb()
     )
 
 @dp.callback_query(F.data == "back:payment")
@@ -680,7 +681,7 @@ async def back_payment(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "💳 Ընտրիր վճարման եղանակը",
-        markup=payment_kb()
+        reply_markup=payment_kb()
     )
 
 # ⭐ PHOTO_INPUT
@@ -702,16 +703,16 @@ async def photo_input(message: Message):
         
         await message.answer(
             f"📸 Screenshot-ը ստացվեց։\n\n⏳ Սպասիր՝ ադմինը կստուգի screenshot-ը և կընտրի համապատասխան գինը {product_name}-ի համար։",
-            markup=back_main_kb()
+            reply_markup=back_main_kb()
         )
         return
     
     if not u.get("order_id"):
-        await message.answer("⏳ Դուք դեռ չեք սկսել գնումը։\n\nԸնտրիր ապրանքը գլխավոր մենյուից։", markup=main_kb())
+        await message.answer("⏳ Դուք դեռ չեք սկսել գնումը։\n\nԸնտրիր ապրանքը գլխավոր մենյուից։", reply_markup=main_kb())
         return
     
     if not u.get("price"):
-        await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", markup=back_main_kb())
+        await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", reply_markup=back_main_kb())
         return
     
     u["receipt_file_id"] = file_id
@@ -727,7 +728,7 @@ async def photo_input(message: Message):
         "✏️ ԱՅԺՄ ԳՐԻՐ քո Game ID / Username-ը\n"
         "Օրինակ՝ Player123 կամ @nick\n\n"
         "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
-        markup=back_main_kb()
+        reply_markup=back_main_kb()
     )
 
 # ⭐ TEXT_INPUT
@@ -741,7 +742,6 @@ async def text_input(message: Message):
         await message.answer("❌ Տեքստը դատարկ է։\n\nՓորձիր կրկին։")
         return
 
-    # SUPPORT
     if u.get("support_waiting"):
         if SUPPORT_CHANNEL_ID:
             await bot.send_message(
@@ -750,20 +750,18 @@ async def text_input(message: Message):
             )
         u["support_waiting"] = False
         await save_state()
-        await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", markup=main_kb())
+        await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", reply_markup=main_kb())
         return
 
-    # REFUND
     if u.get("refund_waiting"):
         u["refund_details"] = text
         u["refund_waiting"] = False
         u["status"] = "💸 Վերադարձ"
         await save_state()
         await update_admin_order(uid, admin_refund_kb(uid))
-        await message.answer("✅ Տվյալները ստացվեցին։\n\nԱդմինը կկատարի վերադարձը։", markup=main_kb())
+        await message.answer("✅ Տվյալները ստացվեցին։\n\nԱդմինը կկատարի վերադարձը։", reply_markup=main_kb())
         return
 
-    # GAME ID / USERNAME
     if u.get("game_id_waiting"):
         if not text:
             await message.answer("❌ ID / Username-ը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ Game ID / Username-ը։")
@@ -782,11 +780,10 @@ async def text_input(message: Message):
             "🔑 ԱՅԺՄ ԳՐԻՐ քո պասսվորդը\n"
             "📝 Օրինակ՝ MyPass123\n\n"
             "⚠️ Պասսվորդը կտեսնի միայն ադմինը։",
-            markup=back_main_kb()
+            reply_markup=back_main_kb()
         )
         return
 
-    # GAME PASSWORD
     if u.get("game_password_waiting"):
         if not text:
             await message.answer("❌ Պասսվորդը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ պասսվորդը։")
@@ -802,11 +799,10 @@ async def text_input(message: Message):
         await message.answer(
             "✅ Պասսվորդը ստացվեց։\n\n"
             "⏳ Սպասիր ադմինի կողմից չեկի հաստատմանը։",
-            markup=main_kb()
+            reply_markup=main_kb()
         )
         return
 
-    # 2FA CODE
     if u.get("verification_code_waiting"):
         if len(text) == 6 and text.isdigit():
             u["verification_code_waiting"] = False
@@ -819,7 +815,7 @@ async def text_input(message: Message):
                 "✅ 2FA կոդը հաստատվեց։\n\n"
                 "Պատվերը պատրաստ է ավարտման։\n\n"
                 "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
-                markup=main_kb()
+                reply_markup=main_kb()
             )
             return
         else:
@@ -829,11 +825,11 @@ async def text_input(message: Message):
                 f"❌ Սխալ կոդ (փորձ #{u['verification_attempts']})\n\n"
                 f"Մուտքագրիր 6-նիշանի կոդը (միայն թվեր)։\n\n"
                 f"📝 Օրինակ՝ 123456",
-                markup=back_main_kb()
+                reply_markup=back_main_kb()
             )
             return
 
-    await message.answer("Ընտրիր բաժինը։", markup=main_kb())
+    await message.answer("Ընտրիր բաժինը։", reply_markup=main_kb())
 
 @dp.callback_query(F.data == "contact:open")
 async def contact_open(c: CallbackQuery):
@@ -843,9 +839,10 @@ async def contact_open(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "📩 Կապ Games Vault Shop-ի հետ\n\nՈւղարկիր հաղորդագրություն, և մենք կպատասխանենք։",
-        markup=back_main_kb()
+        reply_markup=back_main_kb()
     )
 
+# ⭐ BRAWL PASS ADMIN
 @dp.callback_query(F.data.startswith("bpset:"))
 async def bp_set_price(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -913,13 +910,13 @@ async def bp_reject(c: CallbackQuery):
         f"Ուղարկիր նոր, ամբողջական և ավելի հստակ screenshot {u['product']}-ի համար։\n\n"
         f"📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։\n\n"
         f"⚠️ Հին պատվերը չի կրկնվի, սպասում ենք նոր screenshot-ի։",
-        markup=back_main_kb()
+        back_main_kb()
     )
     
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
-# ⭐ RECEIPT_ACCEPT - ՉԵԿԻ ՀԱՍՏԱՏՈՒՄ
+# ⭐ RECEIPT_ACCEPT
 @dp.callback_query(F.data.startswith("receipt:accept:"))
 async def receipt_accept(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -941,13 +938,12 @@ async def receipt_accept(c: CallbackQuery):
     u["status"] = "✅ Չեկը հաստատված է"
     await save_state()
     
-    # ⭐ ՄԻԱՅՆ ՀԻՄԱ ՑՈՒՑԱԴՐԵԼ ԲՈԼՈՐ ԿՈՃԱԿՆԵՐԸ
     await update_admin_order(uid, admin_main_kb(uid))
     
     await send_client(uid, "✅ Վճարման չեկը հաստատվեց։\n\n⏳ Սպասիր ադմինի կողմից պատվերի շարունակությանը։")
     await safe_answer(c, "✅ Չեկը հաստատվեց")
 
-# ⭐ RECEIPT_REJECT - ՉԵԿԻ ՄԵՐԺՈՒՄ
+# ⭐ RECEIPT_REJECT
 @dp.callback_query(F.data.startswith("receipt:reject:"))
 async def receipt_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -965,7 +961,7 @@ async def receipt_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c, "❌ Չեկը մերժվեց")
 
-# ⭐ RECEIPT_BAD - ՉԵԿԸ ՎԱՏ Է ԵՐԵՎՈՒՄ
+# ⭐ RECEIPT_BAD
 @dp.callback_query(F.data.startswith("receipt:bad:"))
 async def receipt_bad(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -989,7 +985,7 @@ async def receipt_bad(c: CallbackQuery):
         "• ամբողջական (երևում է ամբողջ չեկը)\n"
         "• լավ լուսավորված\n\n"
         "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
-        markup=back_main_kb()
+        back_main_kb()
     )
     
     await update_admin_order(uid, admin_receipt_kb(uid))
@@ -1073,18 +1069,15 @@ async def order_complete(c: CallbackQuery):
         u["verification_type"] = "Пропущено"
         u["verification_done"] = True
     
-    # ⭐ ՊԱՀՊԱՆԵԼ ՏՎՅԱԼՆԵՐԸ ԱՎԱՐՏԻ ՀԱՄԱՐ
     order_id = u.get("order_id")
     username = u.get("username")
     product = u.get("product")
     price = u.get("price")
-    game = u.get("game")
     
     u["status"] = "✅ Ավարտված"
     u["is_completed"] = True
     u["completed_at"] = datetime.datetime.now().isoformat()
     
-    # ⭐ ՄԱՔՐԵԼ ՏՎՅԱԼՆԵՐԸ (ԲԱՑԻ ԱՎԱՐՏԻ ՀԱՄԱՐ)
     u["game_id"] = None
     u["game_password"] = None
     u["payment"] = None
@@ -1105,7 +1098,6 @@ async def order_complete(c: CallbackQuery):
     await save_state()
     await update_admin_order(uid, None)
     
-    # ⭐ ԳԵՐԱՑՈՒՑԻՉ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ
     await send_client(
         uid,
         f"🎉 Պատվերը ավարտված է\n\n"
@@ -1191,7 +1183,7 @@ async def verify_menu(c: CallbackQuery):
         "🔐 Authenticator - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
         "📧 E-mail - մուտքագրիր կոդը E-mail-ից\n\n"
         "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
-        markup=verify_catalog_kb(uid)
+        reply_markup=verify_catalog_kb(uid)
     )
 
 @dp.callback_query(F.data.startswith("verify:back:"))
@@ -1204,7 +1196,7 @@ async def verify_back(c: CallbackQuery):
     await safe_answer(c)
     await c.message.edit_text(
         "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        markup=admin_main_kb(uid)
+        reply_markup=admin_main_kb(uid)
     )
 
 @dp.callback_query(F.data.startswith("verify:device:"))
@@ -1238,7 +1230,7 @@ async def verify_device(c: CallbackQuery):
     await c.message.edit_text(
         "✅ 2FA՝ Այլ սարքով հաստատում — հրահանգը ուղարկվեց клиенту\n\n"
         "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        markup=admin_main_kb(uid)
+        reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "✅ 2FA՝ Այլ սարք — հրահանգը ուղարկվեց")
 
@@ -1273,7 +1265,7 @@ async def verify_auth(c: CallbackQuery):
     await c.message.edit_text(
         "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        markup=admin_main_kb(uid)
+        reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
 
@@ -1308,7 +1300,7 @@ async def verify_email(c: CallbackQuery):
     await c.message.edit_text(
         "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        markup=admin_main_kb(uid)
+        reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
 
@@ -1358,7 +1350,7 @@ async def verify_retry(c: CallbackQuery):
         "🔄 Նոր 2FA կոդը ուղարկվեց клиенту\n\n"
         "⏳ Սպասում ենք նոր կոդի մուտքագրմանը...\n\n"
         "🛠 Ադմինի վահանակ",
-        markup=admin_main_kb(uid)
+        reply_markup=admin_main_kb(uid)
     )
     await safe_answer(c, "🔄 Նոր կոդը ուղարկվեց клиенту")
 
