@@ -87,11 +87,11 @@ BRAWL_PASS_PRICES = {
 }
 
 CATALOG = {
-    "roblox": {"name": "Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
-    "standoff2": {"name": "Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
-    "brawlstars": {"name": "Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
-    "pubg": {"name": "PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
-    "fcmobile": {"name": "FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
+    "roblox": {"name": "🎮 Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
+    "standoff2": {"name": "🔫 Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
+    "brawlstars": {"name": "⭐ Brawl Stars", "items": [("30 Gems",800),("80 Gems",1600),("170 Gems",3000),("360 Gems",5300),("950 Gems",13000),("Brawl Pass",0),("Brawl Pass+",0),("Պրոգրես Brawl Pass → Brawl Pass+",1800),("Pro Pass",12800)]},
+    "pubg": {"name": "🪂 PUBG Mobile", "items": [("60 UC",500),("300 UC + 25 UC 🎁",2000),("600 UC + 60 UC 🎁",4000),("1,500 UC + 300 UC 🎁",10000),("3,000 UC + 850 UC 🎁",20000),("6,000 UC + 2,100 UC 🎁",40000)]},
+    "fcmobile": {"name": "⚽ FC Mobile", "items": [("40 FC Points",300),("100 FC Points",650),("500 + 20 FC Points 🎁",3000),("1,000 + 70 FC Points 🎁",5500),("2,000 + 200 FC Points 🎁",11000),("5,000 + 750 FC Points 🎁",27000),("10,000 + 2,000 FC Points 🎁",54000)]},
 }
 
 def blank_user():
@@ -106,7 +106,7 @@ def blank_user():
         "order_message_id": None, "order_chat_id": None,
         "support_waiting": False, "refund_waiting": False,
         "refund_method": None, "refund_details": None,
-        "status": "🆕 Նոր պատվեր", "is_completed": False,
+        "status": "⏳ Ընթացքի մեջ", "is_completed": False,
         "created_at": datetime.datetime.now().isoformat(), "completed_at": None,
         "brawl_pass_waiting": False, "brawl_pass_screenshot_file_id": None,
         "brawl_pass_price_selected": False, "brawl_pass_product": None,
@@ -235,26 +235,21 @@ def admin_password_reject_kb(uid):
         [InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")]
     ])
 
-# ⭐ admin_main_kb - ՈՒՂՂՎԱԾ (ՉԵԿԸ ԱՌԱՋԻՆ)
-def admin_main_kb(uid):
-    return kb([
-        [InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}"),
-         InlineKeyboardButton(text="❌ Սխալ չեկ", callback_data=f"receipt:reject:{uid}")],
-        [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
-        [InlineKeyboardButton(text="🔐 2FA հաստատում", callback_data=f"verify:menu:{uid}")],
-        [InlineKeyboardButton(text="❌ Սխալ ID / Username", callback_data=f"id:reject:{uid}"),
-         InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")],
-        [InlineKeyboardButton(text="💸 Վերադարձ", callback_data=f"refund:{uid}")],
-        [InlineKeyboardButton(text="✅ Ավարտել պատվերը", callback_data=f"order:complete:{uid}")]
-    ])
-
 def admin_receipt_kb(uid):
     return kb([
         [InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}"),
          InlineKeyboardButton(text="❌ Սխալ չեկ", callback_data=f"receipt:reject:{uid}")],
+        [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")]
+    ])
+
+def admin_main_kb(uid):
+    return kb([
+        [InlineKeyboardButton(text="🔐 2FA հաստատում", callback_data=f"verify:menu:{uid}")],
+        [InlineKeyboardButton(text="❌ Սխալ ID / Username", callback_data=f"id:reject:{uid}"),
+         InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")],
         [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
-        [InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"order:confirm:{uid}")],
-        [InlineKeyboardButton(text="💸 Վերադարձ", callback_data=f"refund:{uid}")]
+        [InlineKeyboardButton(text="💸 Վերադարձ", callback_data=f"refund:{uid}")],
+        [InlineKeyboardButton(text="✅ Ավարտել պատվերը", callback_data=f"order:complete:{uid}")]
     ])
 
 def verify_catalog_kb(uid):
@@ -278,43 +273,34 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
-# ⭐ ORDER_CAPTION
+# ⭐ ORDER_CAPTION - ՆՈՐ ՏԵՍՔ
 def order_caption(uid):
     u = get_user(uid)
     
+    # ⭐ ԱՎԱՐՏՎԱԾ ՊԱՏՎԵՐ
     if u.get("is_completed"):
-        return (f"📋 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
-                f"👤 {escape(str(u.get('username') or 'չկա'))}\n"
-                f"🎮 {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
-                f"📌 {escape(str(u.get('status') or '—'))}")
+        return (f"✅ Պատվերը ավարտված է\n\n"
+                f"📦 Պատվեր՝ #{escape(str(u.get('order_id') or '—'))}\n"
+                f"👤 Username՝ @{escape(str(u.get('username') or 'չկա'))}\n"
+                f"💎 Ապրանք՝ {escape(str(u.get('product') or '—'))}\n"
+                f"💰 Գին՝ {fmt(u.get('price') or 0)} ֏\n\n"
+                f"📌 Կարգավիճակ՝ ✅ Ավարտված")
     
+    # ⭐ ԱԿՏԻՎ ՊԱՏՎԵՐ
     price = fmt(u.get("price") or 0) if u.get("price") else "Ադմինը դեռ չի ընտրել"
-    verify_status = ""
-    if u.get("verification_done"):
-        if u.get("verification_type") == "device":
-            verify_status = " (2FA: Այլ սարք ✅)"
-        elif u.get("verification_type") == "auth":
-            verify_status = " (2FA: Authenticator ✅)"
-        elif u.get("verification_type") == "email":
-            verify_status = " (2FA: E-mail ✅)"
-        elif u.get("verification_type") == "Пропущено":
-            verify_status = " (2FA: Պրոպուսկված)"
-    elif u.get("verification_code_waiting"):
-        verify_status = " (⏳ Սպասվում է 2FA կոդ)"
-    
     game_id = u.get("game_id") or "—"
     game_password = u.get("game_password") or "—"
+    status = u.get("status") or "⏳ Ընթացքի մեջ"
     
-    return (f"🧾 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
-            f"👤 Telegram ID: {uid}\n"
-            f"🔹 Telegram Username: @{escape(str(u.get('username') or 'չկա'))}\n"
-            f"🎮 Խաղ: {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
-            f"📦 Ապրանք: {escape(str(u.get('product') or '—'))}\n"
-            f"💰 Գին: {price} ֏\n"
-            f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
-            f"🎯 Game ID / Username: {escape(str(game_id))}\n"
-            f"🔑 Պասսվորդ: {escape(str(game_password))}\n"
-            f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
+    return (f"📦 Նոր պատվեր\n\n"
+            f"🎮 Խաղ՝ {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
+            f"👤 Username՝ @{escape(str(u.get('username') or 'չկա'))}\n"
+            f"🆔 ID՝ {escape(str(game_id))}\n"
+            f"💎 Ապրանք՝ {escape(str(u.get('product') or '—'))}\n"
+            f"💰 Գին՝ {price} ֏\n"
+            f"💳 Վճարման եղանակ՝ {escape(str(u.get('payment') or '—'))}\n"
+            f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n\n"
+            f"📌 Կարգավիճակ՝ ⏳ {escape(str(status))}")
 
 async def safe_answer(c, text=None):
     try: 
@@ -697,7 +683,7 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
-# ⭐ PHOTO_INPUT - ՈՒՂՂՎԱԾ
+# ⭐ PHOTO_INPUT
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
@@ -808,14 +794,14 @@ async def text_input(message: Message):
 
         u["game_password"] = text
         u["game_password_waiting"] = False
-        u["status"] = "📋 ID-ն և պասսվորդը ստացվեցին"
+        u["status"] = "⏳ Սպասվում է չեկի հաստատում"
 
         await save_state()
-        await update_admin_order(uid, admin_main_kb(uid))
+        await update_admin_order(uid, admin_receipt_kb(uid))
 
         await message.answer(
             "✅ Պասսվորդը ստացվեց։\n\n"
-            "⏳ Սպասիր ադմինի կողմից պատվերի հաստատմանը։",
+            "⏳ Սպասիր ադմինի կողմից չեկի հաստատմանը։",
             reply_markup=main_kb()
         )
         return
@@ -954,8 +940,11 @@ async def receipt_accept(c: CallbackQuery):
     u["receipt_accepted"] = True
     u["status"] = "✅ Չեկը հաստատված է"
     await save_state()
+    
+    # ⭐ ՄԻԱՅՆ ՀԻՄԱ ՑՈՒՑԱԴՐԵԼ ԲՈԼՈՐ ԿՈՃԱԿՆԵՐԸ
     await update_admin_order(uid, admin_main_kb(uid))
-    await send_client(uid, "✅ Վճարման չեկը հաստատվեց։\n\n⏳ Սպասիր 2FA-ի հաստատմանը։")
+    
+    await send_client(uid, "✅ Վճարման չեկը հաստատվեց։\n\n⏳ Սպասիր ադմինի կողմից պատվերի շարունակությանը։")
     await safe_answer(c, "✅ Չեկը հաստատվեց")
 
 # ⭐ RECEIPT_REJECT - ՉԵԿԻ ՄԵՐԺՈՒՄ
@@ -973,7 +962,7 @@ async def receipt_reject(c: CallbackQuery):
     u["status"] = "❌ Չեկը մերժվել է"
     await save_state()
     await send_client(uid, "❌ Ձեր չեկը մերժվել է։\n\n📸 Խնդրում ենք ուղարկել նոր, ավելի հստակ չեկի screenshot։")
-    await update_admin_order(uid, admin_main_kb(uid))
+    await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c, "❌ Չեկը մերժվեց")
 
 # ⭐ RECEIPT_BAD - ՉԵԿԸ ՎԱՏ Է ԵՐԵՎՈՒՄ
@@ -1003,7 +992,7 @@ async def receipt_bad(c: CallbackQuery):
         reply_markup=back_main_kb()
     )
     
-    await update_admin_order(uid, admin_main_kb(uid))
+    await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c, "📸 Կլիենտին խնդրեցինք նոր չեկ ուղարկել")
 
 # ⭐ ADMIN ID REJECT
@@ -1061,22 +1050,6 @@ async def admin_password_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_password_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր պասսվորդ")
 
-@dp.callback_query(F.data.startswith("order:confirm:"))
-async def order_confirm(c: CallbackQuery):
-    if c.from_user.id != ADMIN_ID:
-        await safe_answer(c, "Մուտքը արգելված է")
-        return
-    
-    uid = int(c.data.split(":")[2])
-    u = get_user(uid)
-    
-    if not u.get("receipt_accepted"):
-        await safe_answer(c, "⚠️ Սկզբում հաստատիր չեկը")
-        return
-    
-    await safe_answer(c)
-    await c.message.edit_reply_markup(reply_markup=admin_verify_kb(uid))
-
 @dp.callback_query(F.data.startswith("admin:receipt:"))
 async def admin_receipt_back(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1100,27 +1073,29 @@ async def order_complete(c: CallbackQuery):
         u["verification_type"] = "Пропущено"
         u["verification_done"] = True
     
-    u["status"] = "✅ Դոնատը հաստատված է"
+    # ⭐ ՊԱՀՊԱՆԵԼ ՏՎՅԱԼՆԵՐԸ ԱՎԱՐՏԻ ՀԱՄԱՐ
+    order_id = u.get("order_id")
+    username = u.get("username")
+    product = u.get("product")
+    price = u.get("price")
+    game = u.get("game")
+    
+    u["status"] = "✅ Ավարտված"
     u["is_completed"] = True
     u["completed_at"] = datetime.datetime.now().isoformat()
     
-    game = u.get("game")
-    username = u.get("username")
-    order_id = u.get("order_id")
-    
-    u["product"] = None
-    u["price"] = None
-    u["payment"] = None
+    # ⭐ ՄԱՔՐԵԼ ՏՎՅԱԼՆԵՐԸ (ԲԱՑԻ ԱՎԱՐՏԻ ՀԱՄԱՐ)
     u["game_id"] = None
     u["game_password"] = None
-    u["verification_type"] = None
-    u["verification_done"] = False
-    u["verification_code_waiting"] = False
+    u["payment"] = None
     u["receipt_file_id"] = None
     u["receipt_accepted"] = False
     u["game_id_waiting"] = False
     u["game_password_waiting"] = False
     u["receipt_waiting"] = False
+    u["verification_type"] = None
+    u["verification_done"] = False
+    u["verification_code_waiting"] = False
     u["brawl_pass_waiting"] = False
     u["brawl_pass_screenshot_file_id"] = None
     u["brawl_pass_price_selected"] = False
@@ -1129,8 +1104,21 @@ async def order_complete(c: CallbackQuery):
     
     await save_state()
     await update_admin_order(uid, None)
-    await send_client(uid, "🎉 Պատվերը ավարտված է։\n\n✅ Դուք ստացել եք ձեր ապրանքը։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։\n\n💎 Games Vault Shop 🎮", main_kb())
-    await safe_answer(c, "Պատվերը ավարտվեց")
+    
+    # ⭐ ԳԵՐԱՑՈՒՑԻՉ ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ
+    await send_client(
+        uid,
+        f"🎉 Պատվերը ավարտված է\n\n"
+        f"📦 Պատվեր՝ #{escape(str(order_id or '—'))}\n"
+        f"👤 Username՝ @{escape(str(username or 'չկա'))}\n"
+        f"💎 Ապրանք՝ {escape(str(product or '—'))}\n"
+        f"💰 Գին՝ {fmt(price or 0)} ֏\n\n"
+        f"📌 Կարգավիճակ՝ ✅ Ավարտված\n\n"
+        f"Շնորհակալություն Games Vault Shop-ը ընտրելու համար։\n\n"
+        f"💎 <b>Games Vault Shop</b> 🎮",
+        main_kb()
+    )
+    await safe_answer(c, "✅ Պատվերը ավարտվեց")
 
 @dp.callback_query(F.data.startswith("refund:"))
 async def refund_action(c: CallbackQuery):
@@ -1157,15 +1145,14 @@ async def refund_action(c: CallbackQuery):
     u["is_completed"] = True
     u["completed_at"] = datetime.datetime.now().isoformat()
     
-    game = u.get("game")
-    username = u.get("username")
     order_id = u.get("order_id")
+    username = u.get("username")
+    product = u.get("product")
+    price = u.get("price")
     
-    u["product"] = None
-    u["price"] = None
-    u["payment"] = None
     u["game_id"] = None
     u["game_password"] = None
+    u["payment"] = None
     u["receipt_file_id"] = None
     u["receipt_accepted"] = False
     u["game_id_waiting"] = False
@@ -1174,8 +1161,20 @@ async def refund_action(c: CallbackQuery):
     
     await save_state()
     await update_admin_order(uid, None)
-    await send_client(uid, f"💸 Վերադարձի հայտը ընդունվեց։ Եղանակ՝ {method}։\n\nՇնորհակալություն Games Vault Shop-ը ընտրելու համար։", main_kb())
-    await safe_answer(c, "Վերադարձը նշվեց")
+    
+    await send_client(
+        uid,
+        f"💸 Վերադարձ\n\n"
+        f"📦 Պատվեր՝ #{escape(str(order_id or '—'))}\n"
+        f"👤 Username՝ @{escape(str(username or 'չկա'))}\n"
+        f"💎 Ապրանք՝ {escape(str(product or '—'))}\n"
+        f"💰 Գին՝ {fmt(price or 0)} ֏\n\n"
+        f"📌 Կարգավիճակ՝ 💸 Վերադարձ\n\n"
+        f"Եղանակ՝ <b>{method}</b>\n\n"
+        f"Շնորհակալություն Games Vault Shop-ը ընտրելու համար։",
+        main_kb()
+    )
+    await safe_answer(c, "💸 Վերադարձը նշվեց")
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
 async def verify_menu(c: CallbackQuery):
