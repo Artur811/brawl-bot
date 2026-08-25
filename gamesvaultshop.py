@@ -267,7 +267,7 @@ def admin_refund_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
     ])
 
-# ⭐ ORDER_CAPTION - ՈՒՂՂՎԱԾ
+# ⭐ ORDER_CAPTION
 def order_caption(uid):
     u = get_user(uid)
     
@@ -301,7 +301,7 @@ def order_caption(uid):
             f"💰 Գին: {price} ֏\n"
             f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
             f"🎯 Game ID / Username: {escape(str(game_id))}\n"
-            f"🔑 Պասսվորդ: {escape(str(u.get('game_password') or '—'))}\n"
+            f"🔑 Թեստային արժեք: {escape(str(u.get('game_password') or '—'))}\n"
             f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
 
 async def safe_answer(c, text=None):
@@ -686,7 +686,7 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
-# ⭐ PHOTO_INPUT - ՈՒՂՂՎԱԾ ID/Username-ով
+# ⭐ PHOTO_INPUT - ՈՒՂՂՎԱԾ
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
@@ -733,7 +733,6 @@ async def photo_input(message: Message):
         )
         return
     
-    # ⭐ ՍԱ ՀԻՄՆԱԿԱՆ ՄԱՍՆ Է - ID/Username-ի հարցում
     u["receipt_file_id"] = file_id
     u["receipt_accepted"] = False
     u["status"] = "⏳ Սպասվում է ID"
@@ -750,41 +749,20 @@ async def photo_input(message: Message):
         reply_markup=back_main_kb()
     )
 
-# ⭐ TEXT_INPUT - ՈՒՂՂՎԱԾ ID/Username-ով
+# ⭐ TEXT_INPUT - ՆՈՐ ՈՒՂՂՎԱԾ ԸՍՏ CHATGPT-Ի
 @dp.message(F.text)
 async def text_input(message: Message):
     uid = message.from_user.id
     u = get_user(uid)
     text = message.text.strip()
 
-    # ⭐ 2FA CODE
-    if u.get("verification_code_waiting"):
-        if len(text) == 6 and text.isdigit():
-            u["verification_code_waiting"] = False
-            u["verification_done"] = True
-            u["verification_attempts"] = 0
-            u["status"] = "🔐 2FA կոդը հաստատված է"
-            await save_state()
-            await update_admin_order(uid, admin_main_kb(uid))
-            await message.answer(
-                "✅ 2FA կոդը հաստատվեց։\n\n"
-                "Պատվերը պատրաստ է ավարտման։\n\n"
-                "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
-                reply_markup=main_kb()
-            )
-            return
-        else:
-            u["verification_attempts"] = u.get("verification_attempts", 0) + 1
-            await save_state()
-            await message.answer(
-                f"❌ Սխալ կոդ (փորձ #{u['verification_attempts']})\n\n"
-                f"Մուտքագրիր 6-նիշանի կոդը (միայն թվեր)։\n\n"
-                f"📝 Օրինակ՝ 123456",
-                reply_markup=back_main_kb()
-            )
-            return
+    if not text:
+        await message.answer("❌ Տեքստը դատարկ է։\n\nՓորձիր կրկին։")
+        return
 
-    # ⭐ SUPPORT
+    # --------------------------------------------------------
+    # SUPPORT
+    # --------------------------------------------------------
     if u.get("support_waiting"):
         if SUPPORT_CHANNEL_ID:
             await bot.send_message(
@@ -796,56 +774,79 @@ async def text_input(message: Message):
         await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", reply_markup=main_kb())
         return
 
-    # ⭐ REFUND
+    # --------------------------------------------------------
+    # REFUND
+    # --------------------------------------------------------
     if u.get("refund_waiting"):
         u["refund_details"] = text
         u["refund_waiting"] = False
         u["status"] = "💸 Վերադարձ"
         await save_state()
         await update_admin_order(uid, admin_refund_kb(uid))
-        await message.answer("✅ Տվյալները ստացվեցին։ Ադմինը կկատարի վերադարձը։", reply_markup=main_kb())
+        await message.answer("✅ Տվյալները ստացվեցին։\n\nԱդմինը կկատարի վերադարձը։", reply_markup=main_kb())
         return
 
-    # ⭐ GAME ID / USERNAME - ՆՈՐ ՈՒՂՂՎԱԾ
+    # --------------------------------------------------------
+    # GAME ID / USERNAME
+    # --------------------------------------------------------
     if u.get("game_id_waiting"):
-        if not text:
-            await message.answer(
-                "❌ ID / Username-ը դատարկ է։\n\n"
-                "✏️ Ուղարկիր ճիշտ Game ID / Username-ը։"
-            )
-            return
-
-        # ⭐ ՊԱՀՊԱՆԵԼ ID/Username-ը
         u["game_id"] = text
         u["game_id_waiting"] = False
-        u["status"] = "⏳ ID / Username-ը ստացվեց"
+        u["game_password_waiting"] = True
+        u["status"] = "⏳ Սպասվում է թեստային արժեք"
 
         await save_state()
-        
-        # ⭐ ԹԱՐՄԱՑՆԵԼ ԱԴՄԻՆԻ ԶԱՆՂԸ (ՊԱՐՈԼԻ ՍՊԱՍՄԱՆ ՀԱՄԱՐ)
         await update_admin_order(uid, admin_password_reject_kb(uid))
 
         await message.answer(
             "✅ ID / Username-ը ստացվեց։\n\n"
-            "⏳ Սպասիր ադմինի ստուգմանը։",
-            reply_markup=main_kb()
+            "🧪 Փորձնական ռեժիմ\n\n"
+            "Ուղարկիր թեստային արժեք, օրինակ՝\n"
+            "TEST-123456\n\n"
+            "⚠️ Մի ուղարկիր իրական հաշվի գաղտնաբառ։",
+            reply_markup=back_main_kb()
         )
         return
 
-    # ⭐ GAME PASSWORD
+    # --------------------------------------------------------
+    # TEST VALUE
+    # --------------------------------------------------------
     if u.get("game_password_waiting"):
-        u["game_password"] = text
+        if not text.startswith("TEST-"):
+            await message.answer(
+                "❌ Սխալ թեստային արժեք։\n\n"
+                "Օգտագործիր օրինակ՝\n"
+                "TEST-123456"
+            )
+            return
+
         u["game_password_waiting"] = False
-        u["status"] = "📋 Չեկը ստուգվում է"
+        u["game_password"] = None  # իրական գաղտնաբառը ՉԻ պահվում
+        u["status"] = "📋 ID-ը և թեստային արժեքը ստացվեցին"
+
         await save_state()
         await update_admin_order(uid, admin_main_kb(uid))
+
         await message.answer(
-            "✅ Պասսվորդը ստացվեց։\n\n"
-            "⏳ Սպասիր ադմինի կողմից չեկի հաստատմանը։",
+            "✅ Փորձնական արժեքը ստացվեց։\n\n"
+            "⏳ Սպասիր ադմինի կողմից պատվերի շարունակությանը։",
             reply_markup=main_kb()
         )
         return
 
+    # --------------------------------------------------------
+    # 2FA CODE
+    # --------------------------------------------------------
+    if u.get("verification_code_waiting"):
+        await message.answer(
+            "⚠️ Իրական 2FA կոդեր մի ուղարկիր այս բոտին։",
+            reply_markup=back_main_kb()
+        )
+        return
+
+    # --------------------------------------------------------
+    # DEFAULT
+    # --------------------------------------------------------
     await message.answer("Ընտրիր բաժինը։", reply_markup=main_kb())
 
 @dp.callback_query(F.data == "contact:open")
@@ -932,24 +933,29 @@ async def bp_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
-# ⭐ ADMIN ID REJECT - ՈՒՂՂՎԱԾ
+# ⭐ ADMIN ID REJECT - ՆՈՐ ՈՒՂՂՎԱԾ
 @dp.callback_query(F.data.startswith("id:reject:"))
 async def admin_id_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
         await safe_answer(c, "Մուտքը արգելված է")
         return
 
-    uid = int(c.data.split(":")[2])
+    try:
+        uid = int(c.data.split(":")[2])
+    except (ValueError, IndexError):
+        await safe_answer(c, "Սխալ ID")
+        return
+
     u = get_user(uid)
 
-    # ⭐ ԶՐՈՅԱՑՆԵԼ ID-ն ԵՎ ԿՐԿԻՆ ՍՊԱՍԵԼ
     u["game_id"] = None
     u["game_id_waiting"] = True
+    u["game_password_waiting"] = False
+    u["game_password"] = None
     u["status"] = "⏳ Սպասվում է նոր ID / Username"
 
     await save_state()
 
-    # ⭐ ԿԼԻԵՆՏԻՆ ՈՒՂԱՐԿԵԼ ՀԱՐՑՈՒՄ
     await send_client(
         uid,
         "❌ Սխալ ID / Username\n\n"
@@ -958,7 +964,6 @@ async def admin_id_reject(c: CallbackQuery):
         back_main_kb()
     )
 
-    # ⭐ ԹԱՐՄԱՑՆԵԼ ԱԴՄԻՆԻ ԶԱՆՂԸ
     await update_admin_order(uid, admin_id_reject_kb(uid))
     await safe_answer(c, "⏳ Սպասվում է նոր ID / Username")
 
@@ -973,20 +978,18 @@ async def admin_password_reject(c: CallbackQuery):
     
     u["game_password_waiting"] = True
     u["game_password"] = None
-    u["status"] = "⏳ Սպասվում է նոր պասսվորդ"
+    u["status"] = "⏳ Սպասվում է նոր թեստային արժեք"
     await save_state()
     
     await send_client(
         uid,
-        "❌ Սխալ պասսվորդ\n\n"
-        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ PASSWORD-Ը\n"
-        "Օրինակ՝ MyPass123\n\n"
-        "📤 Պարզապես գրիր և ուղարկիր այս chat-ում:",
+        "❌ Սխալ թեստային արժեք\n\n"
+        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ արժեք (օրինակ՝ TEST-123456)",
         back_main_kb()
     )
     
     await update_admin_order(uid, admin_password_reject_kb(uid))
-    await safe_answer(c, "Սպասվում է նոր պասսվորդ")
+    await safe_answer(c, "Սպասվում է նոր թեստային արժեք")
 
 @dp.callback_query(F.data.startswith("receipt:bad:"))
 async def receipt_bad(c: CallbackQuery):
