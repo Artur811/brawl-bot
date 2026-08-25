@@ -235,14 +235,26 @@ def admin_password_reject_kb(uid):
         [InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")]
     ])
 
+# ⭐ admin_main_kb - ՈՒՂՂՎԱԾ (ՉԵԿԸ ԱՌԱՋԻՆ)
 def admin_main_kb(uid):
     return kb([
+        [InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}"),
+         InlineKeyboardButton(text="❌ Սխալ չեկ", callback_data=f"receipt:reject:{uid}")],
+        [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
         [InlineKeyboardButton(text="🔐 2FA հաստատում", callback_data=f"verify:menu:{uid}")],
         [InlineKeyboardButton(text="❌ Սխալ ID / Username", callback_data=f"id:reject:{uid}"),
          InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")],
-        [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
         [InlineKeyboardButton(text="💸 Վերադարձ", callback_data=f"refund:{uid}")],
         [InlineKeyboardButton(text="✅ Ավարտել պատվերը", callback_data=f"order:complete:{uid}")]
+    ])
+
+def admin_receipt_kb(uid):
+    return kb([
+        [InlineKeyboardButton(text="✅ Հաստատել չեկը", callback_data=f"receipt:accept:{uid}"),
+         InlineKeyboardButton(text="❌ Սխալ չեկ", callback_data=f"receipt:reject:{uid}")],
+        [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
+        [InlineKeyboardButton(text="📦 Հաստատել պատվերը", callback_data=f"order:confirm:{uid}")],
+        [InlineKeyboardButton(text="💸 Վերադարձ", callback_data=f"refund:{uid}")]
     ])
 
 def verify_catalog_kb(uid):
@@ -708,7 +720,6 @@ async def photo_input(message: Message):
         )
         return
     
-    # ⭐ ՋՆՋԵԼ ԵՆՔ receipt_waiting ԲԼՈԿԸ
     if not u.get("order_id"):
         await message.answer("⏳ Դուք դեռ չեք սկսել գնումը։\n\nԸնտրիր ապրանքը գլխավոր մենյուից։", reply_markup=main_kb())
         return
@@ -717,7 +728,6 @@ async def photo_input(message: Message):
         await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", reply_markup=back_main_kb())
         return
     
-    # ⭐ ID/Username-ի հարցում
     u["receipt_file_id"] = file_id
     u["receipt_accepted"] = False
     u["status"] = "⏳ Սպասվում է ID"
@@ -734,7 +744,7 @@ async def photo_input(message: Message):
         reply_markup=back_main_kb()
     )
 
-# ⭐ TEXT_INPUT - ՈՒՂՂՎԱԾ (ԻՐԱԿԱՆ ՊԱՍՍՎՈՐԴ)
+# ⭐ TEXT_INPUT
 @dp.message(F.text)
 async def text_input(message: Message):
     uid = message.from_user.id
@@ -745,9 +755,7 @@ async def text_input(message: Message):
         await message.answer("❌ Տեքստը դատարկ է։\n\nՓորձիր կրկին։")
         return
 
-    # --------------------------------------------------------
     # SUPPORT
-    # --------------------------------------------------------
     if u.get("support_waiting"):
         if SUPPORT_CHANNEL_ID:
             await bot.send_message(
@@ -759,9 +767,7 @@ async def text_input(message: Message):
         await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", reply_markup=main_kb())
         return
 
-    # --------------------------------------------------------
     # REFUND
-    # --------------------------------------------------------
     if u.get("refund_waiting"):
         u["refund_details"] = text
         u["refund_waiting"] = False
@@ -771,9 +777,7 @@ async def text_input(message: Message):
         await message.answer("✅ Տվյալները ստացվեցին։\n\nԱդմինը կկատարի վերադարձը։", reply_markup=main_kb())
         return
 
-    # --------------------------------------------------------
     # GAME ID / USERNAME
-    # --------------------------------------------------------
     if u.get("game_id_waiting"):
         if not text:
             await message.answer("❌ ID / Username-ը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ Game ID / Username-ը։")
@@ -796,9 +800,7 @@ async def text_input(message: Message):
         )
         return
 
-    # --------------------------------------------------------
-    # GAME PASSWORD (ԻՐԱԿԱՆ)
-    # --------------------------------------------------------
+    # GAME PASSWORD
     if u.get("game_password_waiting"):
         if not text:
             await message.answer("❌ Պասսվորդը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ պասսվորդը։")
@@ -818,9 +820,7 @@ async def text_input(message: Message):
         )
         return
 
-    # --------------------------------------------------------
     # 2FA CODE
-    # --------------------------------------------------------
     if u.get("verification_code_waiting"):
         if len(text) == 6 and text.isdigit():
             u["verification_code_waiting"] = False
@@ -847,9 +847,6 @@ async def text_input(message: Message):
             )
             return
 
-    # --------------------------------------------------------
-    # DEFAULT
-    # --------------------------------------------------------
     await message.answer("Ընտրիր բաժինը։", reply_markup=main_kb())
 
 @dp.callback_query(F.data == "contact:open")
@@ -936,6 +933,79 @@ async def bp_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
+# ⭐ RECEIPT_ACCEPT - ՉԵԿԻ ՀԱՍՏԱՏՈՒՄ
+@dp.callback_query(F.data.startswith("receipt:accept:"))
+async def receipt_accept(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    uid = int(c.data.split(":")[2])
+    u = get_user(uid)
+    
+    if not u.get("game_id"):
+        await safe_answer(c, "⚠️ Սկզբում հաստատիր ID / Username-ը")
+        return
+    
+    if not u.get("game_password"):
+        await safe_answer(c, "⚠️ Սկզբում հաստատիր պասսվորդը")
+        return
+    
+    u["receipt_accepted"] = True
+    u["status"] = "✅ Չեկը հաստատված է"
+    await save_state()
+    await update_admin_order(uid, admin_main_kb(uid))
+    await send_client(uid, "✅ Վճարման չեկը հաստատվեց։\n\n⏳ Սպասիր 2FA-ի հաստատմանը։")
+    await safe_answer(c, "✅ Չեկը հաստատվեց")
+
+# ⭐ RECEIPT_REJECT - ՉԵԿԻ ՄԵՐԺՈՒՄ
+@dp.callback_query(F.data.startswith("receipt:reject:"))
+async def receipt_reject(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    uid = int(c.data.split(":")[2])
+    u = get_user(uid)
+    
+    u["receipt_waiting"] = True
+    u["receipt_accepted"] = False
+    u["status"] = "❌ Չեկը մերժվել է"
+    await save_state()
+    await send_client(uid, "❌ Ձեր չեկը մերժվել է։\n\n📸 Խնդրում ենք ուղարկել նոր, ավելի հստակ չեկի screenshot։")
+    await update_admin_order(uid, admin_main_kb(uid))
+    await safe_answer(c, "❌ Չեկը մերժվեց")
+
+# ⭐ RECEIPT_BAD - ՉԵԿԸ ՎԱՏ Է ԵՐԵՎՈՒՄ
+@dp.callback_query(F.data.startswith("receipt:bad:"))
+async def receipt_bad(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    uid = int(c.data.split(":")[2])
+    u = get_user(uid)
+    
+    u["receipt_waiting"] = True
+    u["receipt_accepted"] = False
+    u["status"] = "📸 Սպասվում է նոր չեկ (վատ որակ)"
+    await save_state()
+    
+    await send_client(
+        uid,
+        "📸 Չեկի screenshot-ը վատ է երևում\n\n"
+        "Խնդրում ենք ուղարկել նոր, ավելի հստակ screenshot չեկից։\n\n"
+        "✅ Համոզվեք, որ լուսանկարը՝\n"
+        "• պարզ է և առանց լղոզման\n"
+        "• ամբողջական (երևում է ամբողջ չեկը)\n"
+        "• լավ լուսավորված\n\n"
+        "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
+        reply_markup=back_main_kb()
+    )
+    
+    await update_admin_order(uid, admin_main_kb(uid))
+    await safe_answer(c, "📸 Կլիենտին խնդրեցինք նոր չեկ ուղարկել")
+
 # ⭐ ADMIN ID REJECT
 @dp.callback_query(F.data.startswith("id:reject:"))
 async def admin_id_reject(c: CallbackQuery):
@@ -991,8 +1061,8 @@ async def admin_password_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_password_reject_kb(uid))
     await safe_answer(c, "Սպասվում է նոր պասսվորդ")
 
-@dp.callback_query(F.data.startswith("receipt:bad:"))
-async def receipt_bad(c: CallbackQuery):
+@dp.callback_query(F.data.startswith("order:confirm:"))
+async def order_confirm(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
         await safe_answer(c, "Մուտքը արգելված է")
         return
@@ -1000,25 +1070,22 @@ async def receipt_bad(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
     
-    u["receipt_waiting"] = True
-    u["receipt_accepted"] = False
-    u["status"] = "⏳ Սպասվում է նոր չեկ (վատ որակ)"
-    await save_state()
+    if not u.get("receipt_accepted"):
+        await safe_answer(c, "⚠️ Սկզբում հաստատիր չեկը")
+        return
     
-    await send_client(
-        uid,
-        "📸 Չեկի screenshot-ը վատ է երևում\n\n"
-        "Խնդրում ենք ուղարկել նոր, ավելի հստակ screenshot չեկից։\n\n"
-        "✅ Համոզվեք, որ լուսանկարը՝\n"
-        "• պարզ է և առանց լղոզման\n"
-        "• ամբողջական (երևում է ամբողջ չեկը)\n"
-        "• լավ լուսավորված\n\n"
-        "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
-        reply_markup=back_main_kb()
-    )
+    await safe_answer(c)
+    await c.message.edit_reply_markup(reply_markup=admin_verify_kb(uid))
+
+@dp.callback_query(F.data.startswith("admin:receipt:"))
+async def admin_receipt_back(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
     
-    await update_admin_order(uid, admin_main_kb(uid))
-    await safe_answer(c, "📸 Կլիենտին խնդրեցինք նոր չեկ ուղարկել")
+    uid = int(c.data.split(":")[2])
+    await update_admin_order(uid, admin_receipt_kb(uid))
+    await safe_answer(c)
 
 @dp.callback_query(F.data.startswith("order:complete:"))
 async def order_complete(c: CallbackQuery):
