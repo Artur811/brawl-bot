@@ -105,6 +105,7 @@ def blank_user():
         "receipt_accepted": False,
         "verification_type": None, "verification_done": False,
         "verification_code_waiting": False, "verification_attempts": 0,
+        "verification_device_waiting": False,
         "order_message_id": None, "order_chat_id": None,
         "support_waiting": False, "refund_waiting": False,
         "refund_method": None, "refund_operator": None,
@@ -280,6 +281,12 @@ def verify_catalog_kb(uid):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify:back:{uid}")]
     ])
 
+def verify_device_confirm_kb(uid):
+    return kb([
+        [InlineKeyboardButton(text="✅ Հաստատել եմ", callback_data=f"verify:device:confirm:{uid}")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify:back:{uid}")]
+    ])
+
 def admin_verify_retry_kb(uid, verify_type):
     return kb([
         [InlineKeyboardButton(text="🔄 Ուղարկել նոր կոդ", callback_data=f"verify:retry:{uid}:{verify_type}")],
@@ -363,8 +370,9 @@ async def update_admin_order(uid, markup=None):
             caption=order_caption(uid),
             reply_markup=markup
         )
-    except Exception: 
-        logger.exception("Could not update admin order")
+    except Exception as e:
+        if "message is not modified" not in str(e):
+            logger.exception("Could not update admin order")
 
 async def create_or_replace_order(uid, file_id=None, markup=None):
     u = get_user(uid)
@@ -717,7 +725,7 @@ async def back_payment(c: CallbackQuery):
     )
 
 # ============================================
-# ⭐ ՖՈՏՈԻ ՄՇԱԿՈՒՄ (ՇՏԿՎԱԾ)
+# ⭐ ՖՈՏՈԻ ՄՇԱԿՈՒՄ
 # ============================================
 
 @dp.message(F.photo)
@@ -897,7 +905,7 @@ async def text_input(message: Message):
         )
         return
 
-    # ⭐ 2FA CODE
+    # ⭐ 2FA CODE (Authenticator կամ E-mail)
     if u.get("verification_code_waiting"):
         if len(text) == 6 and text.isdigit():
             u["verification_code_waiting"] = False
@@ -1053,13 +1061,23 @@ async def receipt_reject(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
     
-    u["receipt_waiting"] = True
+    # ⭐ ՉԵԿԸ ՄԵՐԺՎԵԼ Է - ՉԵՆՔ ԽՆԴՐՈՒՄ ՆՈՐ ՉԵԿ
+    u["status"] = "❌ Չեկը մերժվել է (կեղծ)"
     u["receipt_accepted"] = False
-    u["status"] = "❌ Չեկը մերժվել է"
+    u["receipt_waiting"] = False
     await save_state()
-    await send_client(uid, "❌ Ձեր չեկը մերժվել է։\n\n📸 Խնդրում ենք ուղարկել նոր, ավելի հստակ չեկի screenshot։")
-    await update_admin_order(uid, admin_receipt_kb(uid))
-    await safe_answer(c, "❌ Չեկը մերժվեց")
+    
+    await send_client(
+        uid,
+        "❌ Ձեր չեկը ՄԵՐԺՎԵԼ Է։\n\n"
+        "📸 Դուք ուղարկել եք սխալ կամ կեղծ չեկ։\n\n"
+        "⚠️ Եթե կարծում եք, որ սխալ է տեղի ունեցել, կապվեք աջակցության հետ։\n\n"
+        "🔄 Նոր պատվեր սկսելու համար օգտագործեք /start",
+        main_kb()
+    )
+    
+    await update_admin_order(uid, None)
+    await safe_answer(c, "❌ Չեկը մերժվեց, կլիենտը տեղեկացվեց")
 
 # ⭐ ՉԵԿԸ ՎԱՏ Է ԵՐԵՎՈՒՄ - ՉԻ ՋՆՋՈՒՄ ID-Ն ՈՒ ՊԱՍՍՎՈՐԴԸ
 @dp.callback_query(F.data.startswith("receipt:bad:"))
@@ -1162,7 +1180,7 @@ async def admin_receipt_back(c: CallbackQuery):
     await safe_answer(c)
 
 # ============================================
-# ⭐ ՎԵՐԱԴԱՐՁ (REFUND)
+# ⭐ ՎԵՐԱԴԱՐՁ (REFUND) - ՇՏԿՎԱԾ
 # ============================================
 
 @dp.callback_query(F.data.startswith("refund:"))
@@ -1172,6 +1190,29 @@ async def refund_action(c: CallbackQuery):
         return
     
     parts = c.data.split(":")
+    
+    # ⭐ Եթե սա OPERATOR է (refund:operator:{uid}:{operator})
+    if len(parts) >= 4 and parts[1] == "operator":
+        uid = int(parts[2])
+        operator = parts[3]
+        u = get_user(uid)
+        u["refund_operator"] = operator
+        u["refund_waiting"] = True
+        u["status"] = f"💸 Սպասվում է հեռախոսահամար ({operator})"
+        await save_state()
+        await update_admin_order(uid, None)
+        await send_client(
+            uid,
+            f"📱 <b>Օպերատոր՝ {operator}</b>\n\n"
+            f"✏️ ՈՒՂԱՐԿԻՐ հեռախոսահամարը\n"
+            f"📝 Օրինակ՝ 077 123456\n\n"
+            f"⚠️ Համոզվիր, որ համարը ճիշտ է։",
+            back_main_kb()
+        )
+        await safe_answer(c, f"⏳ Սպասվում է հեռախոսահամար ({operator})")
+        return
+    
+    # ⭐ Մնացած դեպքերում uid-ն վերջինն է
     uid = int(parts[-1])
     u = get_user(uid)
     
@@ -1236,26 +1277,6 @@ async def refund_action(c: CallbackQuery):
         )
         await safe_answer(c, "⏳ Սպասվում է օպերատորի ընտրություն")
         return
-    
-    # ⭐ ԿԼԻԵՆՏԸ ԸՆՏՐԵԼ Է ՕՊԵՐԱՏՈՐ
-    if parts[1] == "operator":
-        uid = int(parts[2])
-        operator = parts[3]
-        u = get_user(uid)
-        u["refund_operator"] = operator
-        u["status"] = f"💸 Սպասվում է հեռախոսահամար ({operator})"
-        await save_state()
-        await update_admin_order(uid, None)
-        await send_client(
-            uid,
-            f"📱 <b>Օպերատոր՝ {operator}</b>\n\n"
-            f"✏️ ՈՒՂԱՐԿԻՐ հեռախոսահամարը\n"
-            f"📝 Օրինակ՝ 077 123456\n\n"
-            f"⚠️ Համոզվիր, որ համարը ճիշտ է։",
-            back_main_kb()
-        )
-        await safe_answer(c, f"⏳ Սպասվում է հեռախոսահամար ({operator})")
-        return
 
 # ============================================
 # ⭐ ԱՎԱՐՏԵԼ ՊԱՏՎԵՐԸ
@@ -1294,6 +1315,7 @@ async def order_complete(c: CallbackQuery):
     u["verification_type"] = None
     u["verification_done"] = False
     u["verification_code_waiting"] = False
+    u["verification_device_waiting"] = False
     u["brawl_pass_waiting"] = False
     u["brawl_pass_screenshot_file_id"] = None
     u["brawl_pass_price_selected"] = False
@@ -1318,7 +1340,7 @@ async def order_complete(c: CallbackQuery):
     await safe_answer(c, "✅ Պատվերը ավարտվեց")
 
 # ============================================
-# ⭐ 2FA
+# ⭐ 2FA - ԱՄԲՈՂՋԱԿԱՆ ԲԼՈԿ (ՇՏԿՎԱԾ)
 # ============================================
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
@@ -1328,16 +1350,38 @@ async def verify_menu(c: CallbackQuery):
         return
     
     uid = int(c.data.split(":")[2])
+    u = get_user(uid)
+    
+    if not u.get("order_id") or u.get("is_completed"):
+        await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+        return
+    
     await safe_answer(c)
-    await c.message.edit_text(
-        "🔐 2FA հաստատում\n\n"
-        "Ընտրիր հաստատման եղանակը՝\n\n"
-        "📱 Այլ սարքով - հաստատիր մեկ այլ սարքից\n"
-        "🔐 Authenticator - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
-        "📧 E-mail - մուտքագրիր կոդը E-mail-ից\n\n"
-        "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
-        reply_markup=verify_catalog_kb(uid)
-    )
+    
+    try:
+        await c.message.edit_text(
+            "🔐 <b>2FA հաստատում</b>\n\n"
+            "Ընտրիր հաստատման եղանակը՝\n\n"
+            "📱 <b>Այլ սարքով</b> - հաստատիր Roblox-ը մեկ այլ սարքից\n"
+            "🔐 <b>Authenticator</b> - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
+            "📧 <b>E-mail</b> - մուտքագրիր կոդը E-mail-ից\n\n"
+            "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
+            reply_markup=verify_catalog_kb(uid)
+        )
+    except Exception:
+        try:
+            await c.message.delete()
+        except:
+            pass
+        await c.message.answer(
+            "🔐 <b>2FA հաստատում</b>\n\n"
+            "Ընտրիր հաստատման եղանակը՝\n\n"
+            "📱 <b>Այլ սարքով</b> - հաստատիր Roblox-ը մեկ այլ սարքից\n"
+            "🔐 <b>Authenticator</b> - մուտքագրիր կոդը Google/Microsoft Authenticator-ից\n"
+            "📧 <b>E-mail</b> - մուտքագրիր կոդը E-mail-ից\n\n"
+            "⚠️ Կարող ես նաև պարզապես ավարտել պատվերը առանց 2FA։",
+            reply_markup=verify_catalog_kb(uid)
+        )
 
 @dp.callback_query(F.data.startswith("verify:back:"))
 async def verify_back(c: CallbackQuery):
@@ -1347,42 +1391,123 @@ async def verify_back(c: CallbackQuery):
     
     uid = int(c.data.split(":")[2])
     await safe_answer(c)
-    await c.message.edit_text(
-        "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        reply_markup=admin_main_kb(uid)
-    )
+    try:
+        await c.message.edit_text(
+            "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
+            reply_markup=admin_main_kb(uid)
+        )
+    except Exception:
+        try:
+            await c.message.delete()
+        except:
+            pass
+        await c.message.answer(
+            "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
+            reply_markup=admin_main_kb(uid)
+        )
 
+# ⭐ 2FA - ԱՅԼ ՍԱՐՔՈՎ
 @dp.callback_query(F.data.startswith("verify:device:"))
 async def verify_device(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
         await safe_answer(c, "Մուտքը արգելված է")
         return
     
-    uid = int(c.data.split(":")[2])
-    u = get_user(uid)
+    parts = c.data.split(":")
     
-    u["verification_type"] = "device"
-    u["verification_done"] = True
-    u["verification_code_waiting"] = False
-    u["verification_attempts"] = 0
-    u["status"] = "🔐 2FA՝ Այլ սարքով հաստատում"
-    await save_state()
+    # ⭐ Եթե սա հաստատման կոճակ է (verify:device:confirm:{uid})
+    if len(parts) >= 4 and parts[2] == "confirm":
+        uid = int(parts[3])
+        u = get_user(uid)
+        
+        if not u.get("order_id") or u.get("is_completed"):
+            await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+            return
+        
+        u["verification_type"] = "device"
+        u["verification_done"] = True
+        u["verification_device_waiting"] = False
+        u["status"] = "🔐 2FA՝ Այլ սարքով հաստատված"
+        await save_state()
+        
+        await update_admin_order(uid, admin_main_kb(uid))
+        
+        await send_client(
+            uid,
+            "✅ 2FA հաստատումը հաջողվեց։\n\n"
+            "📱 Դուք հաստատել եք մուտքը այլ սարքից։\n\n"
+            "⏳ Սպասիր ադմինի կողմից պատվերի ավարտմանը։",
+            main_kb()
+        )
+        
+        await safe_answer(c, "✅ 2FA հաստատվեց (այլ սարք)")
+        
+        try:
+            await c.message.edit_text(
+                "🛠 Ադմինի վահանակ\n\n✅ 2FA հաստատվեց",
+                reply_markup=admin_main_kb(uid)
+            )
+        except Exception:
+            try:
+                await c.message.delete()
+            except:
+                pass
+            await c.message.answer(
+                "🛠 Ադմինի վահանակ\n\n✅ 2FA հաստատվեց",
+                reply_markup=admin_main_kb(uid)
+            )
+        return
     
-    await send_client_photo(
-        uid,
-        VERIFY_IMAGES["device"],
-        "📱 2FA — Այլ սարքով հաստատում\n\n"
-        "1️⃣ Բացիր Roblox հավելվածը մեկ այլ սարքից (հեռախոս/պլանշետ)\n"
-        "2️⃣ Հաստատիր մուտքը Roblox հավելվածում\n"
-        "3️⃣ Սեղմիր «Approve» կամ «Հաստատել»\n\n"
-        "⚠️ Կարևոր. Հաստատիր միայն այն մուտքը, որը դու ես սկսել։\n\n"
-        "✅ Հաստատումից հետո պատվերը կավարտվի։",
-        back_main_kb()
-    )
-    
-    await update_admin_order(uid, admin_main_kb(uid))
-    await safe_answer(c, "✅ 2FA՝ Այլ սարք — հրահանգը ուղարկվեց")
+    # ⭐ Սովորական մենյուից ընտրություն (verify:device:{uid})
+    if len(parts) == 3:
+        uid = int(parts[2])
+        u = get_user(uid)
+        
+        if not u.get("order_id") or u.get("is_completed"):
+            await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+            return
+        
+        u["verification_type"] = "device"
+        u["verification_done"] = False
+        u["verification_device_waiting"] = True
+        u["verification_code_waiting"] = False
+        u["verification_attempts"] = 0
+        u["status"] = "⏳ Սպասվում է այլ սարքով հաստատում"
+        await save_state()
+        
+        await send_client_photo(
+            uid,
+            VERIFY_IMAGES["device"],
+            "📱 2FA — Այլ սարքով հաստատում\n\n"
+            "1️⃣ Բացիր Roblox հավելվածը մեկ այլ սարքից (հեռախոս/պլանշետ)\n"
+            "2️⃣ Հաստատիր մուտքը Roblox հավելվածում\n"
+            "3️⃣ Սեղմիր «Approve» կամ «Հաստատել»\n\n"
+            "⚠️ Կարևոր. Հաստատիր միայն այն մուտքը, որը դու ես սկսել։\n\n"
+            "✅ Հաստատումից հետո սեղմիր «✅ Հաստատել եմ» կոճակը։",
+            verify_device_confirm_kb(uid)
+        )
+        
+        try:
+            await c.message.edit_text(
+                "⏳ Սպասում ենք այլ սարքով հաստատման...\n\n"
+                "📱 Կլիենտին ուղարկվել է հրահանգ։\n\n"
+                "🛠 Ադմինի վահանակ",
+                reply_markup=admin_main_kb(uid)
+            )
+        except Exception:
+            try:
+                await c.message.delete()
+            except:
+                pass
+            await c.message.answer(
+                "⏳ Սպասում ենք այլ սարքով հաստատման...\n\n"
+                "📱 Կլիենտին ուղարկվել է հրահանգ։\n\n"
+                "🛠 Ադմինի վահանակ",
+                reply_markup=admin_main_kb(uid)
+            )
+        await safe_answer(c, "⏳ Սպասում ենք այլ սարքով հաստատման")
 
+# ⭐ 2FA - AUTHENTICATOR
 @dp.callback_query(F.data.startswith("verify:auth:"))
 async def verify_auth(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1391,6 +1516,10 @@ async def verify_auth(c: CallbackQuery):
     
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
+    
+    if not u.get("order_id") or u.get("is_completed"):
+        await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+        return
     
     u["verification_type"] = "auth"
     u["verification_done"] = False
@@ -1411,13 +1540,25 @@ async def verify_auth(c: CallbackQuery):
         back_main_kb()
     )
     
-    await c.message.edit_text(
-        "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
-        "🛠 Ադմինի վահանակ",
-        reply_markup=admin_main_kb(uid)
-    )
+    try:
+        await c.message.edit_text(
+            "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
+    except Exception:
+        try:
+            await c.message.delete()
+        except:
+            pass
+        await c.message.answer(
+            "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
 
+# ⭐ 2FA - E-MAIL
 @dp.callback_query(F.data.startswith("verify:email:"))
 async def verify_email(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1426,6 +1567,10 @@ async def verify_email(c: CallbackQuery):
     
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
+    
+    if not u.get("order_id") or u.get("is_completed"):
+        await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+        return
     
     u["verification_type"] = "email"
     u["verification_done"] = False
@@ -1446,11 +1591,22 @@ async def verify_email(c: CallbackQuery):
         back_main_kb()
     )
     
-    await c.message.edit_text(
-        "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
-        "🛠 Ադմինի վահանակ",
-        reply_markup=admin_main_kb(uid)
-    )
+    try:
+        await c.message.edit_text(
+            "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
+    except Exception:
+        try:
+            await c.message.delete()
+        except:
+            pass
+        await c.message.answer(
+            "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
 
 # ============================================
