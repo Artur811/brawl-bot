@@ -18,7 +18,7 @@ from aiogram.types import (
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 
-# ⭐ ՆԱՍՏԱՏՈՒՄՆԵՐ
+# ⭐ ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 ORDER_CHANNEL_ID = os.getenv("ORDER_CHANNEL_ID", "")
@@ -30,7 +30,7 @@ STATE_FILE = Path(os.getenv("STATE_FILE", "orders_state.json"))
 LOG_FILE = Path("bot.log")
 BAN_FILE = Path("banned_users.json")
 
-# ⭐ 2FA-ի նկարների հասցեները
+# ⭐ 2FA-Ի ՆԿԱՐՆԵՐ
 VERIFY_IMAGES = {
     "device": "images/2fa_device.jpg",
     "auth": "images/2fa_auth.jpg",
@@ -38,9 +38,9 @@ VERIFY_IMAGES = {
 }
 
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN չգտնվեց։")
+    raise RuntimeError("BOT_TOKEN չգտնվեց")
 if not ADMIN_ID:
-    raise RuntimeError("ADMIN_ID չգտնվեց։")
+    raise RuntimeError("ADMIN_ID չգտնվեց")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,14 +63,14 @@ banned_users = set()
 state_lock = asyncio.Lock()
 order_stats = defaultdict(int)
 
-# ⭐ STARTUP - DELETE WEBHOOK
+# ⭐ STARTUP
 @dp.startup()
 async def on_startup():
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("✅ Webhook deleted")
+        logger.info("✅ Webhook-ը ջնջվեց")
     except Exception as e:
-        logger.warning(f"Webhook delete failed: {e}")
+        logger.warning(f"Webhook-ի ջնջումը ձախողվեց: {e}")
 
 # ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
 GAME_EMOJIS = {
@@ -87,7 +87,7 @@ BRAWL_PASS_PRICES = {
     "Brawl Pass+": {"low": 3400, "high": 4800}
 }
 
-# ⭐ ԿԱՏԱԼՈԳ - ԲՈԼՈՐ ԽԱՂԵՐԸ
+# ⭐ ԿԱՏԱԼՈԳ
 CATALOG = {
     "roblox": {"name": "Roblox", "items": [("40 Robux",350),("80 Robux",650),("120 Robux",950),("400 Robux",2700),("520 Robux",3600),("840 Robux",4850),("1,240 Robux",7300),("1,700 Robux",8800),("1,820 Robux",9700),("4,500 Robux",21000),("10,000 Robux",40000),("22,500 Robux",88000)]},
     "standoff2": {"name": "Standoff 2", "items": [("100 Gold",1000),("200 Gold",2000),("300 Gold",2900),("500 Gold",4000),("600 Gold",5100),("700 Gold",5800),("1,000 Gold",7100),("1,500 Gold",10300),("3,000 Gold",15800)]},
@@ -107,7 +107,8 @@ def blank_user():
         "verification_code_waiting": False, "verification_attempts": 0,
         "order_message_id": None, "order_chat_id": None,
         "support_waiting": False, "refund_waiting": False,
-        "refund_method": None, "refund_details": None,
+        "refund_method": None, "refund_operator": None,
+        "refund_details": None,
         "status": "⏳ Ընթացքի մեջ", "is_completed": False,
         "created_at": datetime.datetime.now().isoformat(), "completed_at": None,
         "brawl_pass_waiting": False, "brawl_pass_screenshot_file_id": None,
@@ -181,9 +182,9 @@ def game_kb(game):
     for i, (name, price) in enumerate(CATALOG[game]["items"]):
         if name in BRAWL_PASS_PRICES:
             if name == "Brawl Pass":
-                text = "🎫 Brawl Pass — ընտրել գինը ադմինի կողմից"
+                text = "🎫 Brawl Pass — գինը կընտրի ադմինը"
             else:
-                text = "⭐ Brawl Pass+ — ընտրել գինը ադմինի կողմից"
+                text = "⭐ Brawl Pass+ — գինը կընտրի ադմինը"
         else:
             text = f"⚡ {name} — {fmt(price)} ֏"
         rows.append([InlineKeyboardButton(text=text, callback_data=f"product:{game}:{i}")])
@@ -209,7 +210,6 @@ def back_payment_kb():
 def back_main_kb(): 
     return kb([[InlineKeyboardButton(text="⬅️ Հետ", callback_data="back:main")]])
 
-# ⭐ ԱԴՄԻՆԻ ԿՈՃԱԿՆԵՐ
 def admin_bp_kb(uid, product_name):
     prices = BRAWL_PASS_PRICES[product_name]
     return kb([
@@ -255,6 +255,23 @@ def admin_main_kb(uid):
         [InlineKeyboardButton(text="✅ Ավարտել պատվերը", callback_data=f"order:complete:{uid}")]
     ])
 
+def admin_refund_kb(uid):
+    return kb([
+        [InlineKeyboardButton(text="💳 Վերադարձ քարտով", callback_data=f"refund:card:{uid}")],
+        [InlineKeyboardButton(text="💵 Վերադարձ Telcell-ով", callback_data=f"refund:telcell:{uid}")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
+    ])
+
+def operator_kb(uid):
+    return kb([
+        [InlineKeyboardButton(text="📱 Beeline", callback_data=f"refund:operator:{uid}:beeline"),
+         InlineKeyboardButton(text="📱 Ucom", callback_data=f"refund:operator:{uid}:ucom")],
+        [InlineKeyboardButton(text="📱 MTS", callback_data=f"refund:operator:{uid}:mts"),
+         InlineKeyboardButton(text="📱 Viva-MTS", callback_data=f"refund:operator:{uid}:vivamts")],
+        [InlineKeyboardButton(text="📱 Team", callback_data=f"refund:operator:{uid}:team")],
+        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
+    ])
+
 def verify_catalog_kb(uid):
     return kb([
         [InlineKeyboardButton(text="📱 Այլ սարքով հաստատում", callback_data=f"verify:device:{uid}")],
@@ -269,14 +286,7 @@ def admin_verify_retry_kb(uid, verify_type):
         [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"verify:back:{uid}")]
     ])
 
-def admin_refund_kb(uid): 
-    return kb([
-        [InlineKeyboardButton(text="💳 Քարտով վերադարձ", callback_data=f"refund:card:{uid}")],
-        [InlineKeyboardButton(text="💵 Telcell վերադարձ", callback_data=f"refund:telcell:{uid}")],
-        [InlineKeyboardButton(text="⬅️ Հետ", callback_data=f"admin:receipt:{uid}")]
-    ])
-
-# ⭐ ORDER_CAPTION - ՆՈՐ ՏԵՍՔ
+# ⭐ ORDER_CAPTION
 def order_caption(uid):
     u = get_user(uid)
     
@@ -292,6 +302,25 @@ def order_caption(uid):
     game_id = u.get("game_id") or "—"
     game_password = u.get("game_password") or "—"
     status = u.get("status") or "⏳ Ընթացքի մեջ"
+    
+    if u.get("refund_method") == "Քարտ":
+        refund_info = f"💳 Վերադարձ քարտով՝ {escape(str(u.get('refund_details') or '—'))}"
+    elif u.get("refund_method") == "Telcell":
+        refund_info = f"💵 Telcell ({escape(str(u.get('refund_operator') or '—'))})՝ {escape(str(u.get('refund_details') or '—'))}"
+    else:
+        refund_info = ""
+    
+    if refund_info:
+        return (f"📦 Նոր պատվեր\n\n"
+                f"🎮 Խաղ՝ {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
+                f"👤 Username՝ @{escape(str(u.get('username') or 'չկա'))}\n"
+                f"🆔 ID՝ {escape(str(game_id))}\n"
+                f"💎 Ապրանք՝ {escape(str(u.get('product') or '—'))}\n"
+                f"💰 Գին՝ {price} ֏\n"
+                f"💳 Վճարման եղանակ՝ {escape(str(u.get('payment') or '—'))}\n"
+                f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n\n"
+                f"💸 {refund_info}\n\n"
+                f"📌 Կարգավիճակ՝ ⏳ {escape(str(status))}")
     
     return (f"📦 Նոր պատվեր\n\n"
             f"🎮 Խաղ՝ {escape(CATALOG.get(u.get('game'), {}).get('name', '—'))}\n"
@@ -402,12 +431,12 @@ async def clean_old_orders():
                     except:
                         pass
             if deleted > 0:
-                logger.info(f"Cleaned {deleted} old orders")
+                logger.info(f"Ջնջվեց {deleted} հին պատվեր")
                 await save_state()
         except Exception as e:
             logger.exception(f"Clean old orders error: {e}")
 
-# ⭐ HEALTH CHECK SERVER
+# ⭐ HEALTH CHECK
 async def health_handler(request):
     return web.Response(text="OK")
 
@@ -423,7 +452,10 @@ async def run_web():
     while True:
         await asyncio.sleep(3600)
 
-# ⭐ ՀԵՆԴԼԵՐՆԵՐ
+# ============================================
+# ⭐ ՀԻՄՆԱԿԱՆ ՀԵՆԴԼԵՐՆԵՐ
+# ============================================
+
 @dp.message(CommandStart())
 async def start(message: Message):
     uid = message.from_user.id
@@ -480,7 +512,7 @@ async def choose_game(c: CallbackQuery):
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        f"{GAME_EMOJIS.get(game, '🎮')} {CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
+        f"{get_game_emoji(game)} {CATALOG[game]['name']}\n\nԸնտրիր ապրանքը։",
         reply_markup=game_kb(game)
     )
 
@@ -684,13 +716,14 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
-# ⭐ PHOTO_INPUT
+# ⭐ ՖՈՏՈԻ ՄՇԱԿՈՒՄ
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
     u = get_user(uid)
     file_id = message.photo[-1].file_id
     
+    # Brawl Pass screenshot
     if u.get("brawl_pass_waiting") and u.get("brawl_pass_product"):
         product_name = u["brawl_pass_product"]
         u["brawl_pass_screenshot_file_id"] = file_id
@@ -715,6 +748,22 @@ async def photo_input(message: Message):
         await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", reply_markup=back_main_kb())
         return
     
+    # ⭐ ՉԵԿ (ID-ն ու պասսվորդը ՉԵՆ ՋՆՋՎՈՒՄ)
+    if u.get("receipt_waiting"):
+        u["receipt_file_id"] = file_id
+        u["receipt_accepted"] = False
+        u["receipt_waiting"] = False
+        u["status"] = "⏳ Չեկը ստուգվում է"
+        await save_state()
+        
+        await create_or_replace_order(uid, file_id, admin_receipt_kb(uid))
+        await message.answer(
+            "📸 Նոր չեկի screenshot-ը ստացվեց։\n\n✅ Այժմ ադմինը կստուգի այն։",
+            reply_markup=main_kb()
+        )
+        return
+    
+    # ⭐ ԱՌԱՋԻՆ ՉԵԿ
     u["receipt_file_id"] = file_id
     u["receipt_accepted"] = False
     u["status"] = "⏳ Սպասվում է ID"
@@ -731,7 +780,7 @@ async def photo_input(message: Message):
         reply_markup=back_main_kb()
     )
 
-# ⭐ TEXT_INPUT
+# ⭐ ՏԵՔՍՏԻ ՄՇԱԿՈՒՄ
 @dp.message(F.text)
 async def text_input(message: Message):
     uid = message.from_user.id
@@ -742,6 +791,7 @@ async def text_input(message: Message):
         await message.answer("❌ Տեքստը դատարկ է։\n\nՓորձիր կրկին։")
         return
 
+    # ⭐ SUPPORT
     if u.get("support_waiting"):
         if SUPPORT_CHANNEL_ID:
             await bot.send_message(
@@ -753,15 +803,41 @@ async def text_input(message: Message):
         await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", reply_markup=main_kb())
         return
 
+    # ⭐ ՎԵՐԱԴԱՐՁ - ԸՆԴՈՒՆՈՒՄ
     if u.get("refund_waiting"):
-        u["refund_details"] = text
-        u["refund_waiting"] = False
-        u["status"] = "💸 Վերադարձ"
-        await save_state()
-        await update_admin_order(uid, admin_refund_kb(uid))
-        await message.answer("✅ Տվյալները ստացվեցին։\n\nԱդմինը կկատարի վերադարձը։", reply_markup=main_kb())
-        return
+        # ՔԱՐՏ
+        if u.get("refund_method") == "Քարտ":
+            u["refund_details"] = text
+            u["refund_waiting"] = False
+            u["status"] = f"💸 Վերադարձ քարտով՝ {text}"
+            await save_state()
+            await update_admin_order(uid, None)
+            await message.answer(
+                f"✅ Քարտի համարը ստացվեց։\n\n"
+                f"💳 {text}\n\n"
+                f"⏳ Ադմինը կկատարի վերադարձը։",
+                reply_markup=main_kb()
+            )
+            return
+        
+        # TELCELL
+        if u.get("refund_method") == "Telcell":
+            u["refund_details"] = text
+            u["refund_waiting"] = False
+            operator = u.get("refund_operator", "—")
+            u["status"] = f"💸 Վերադարձ Telcell ({operator})՝ {text}"
+            await save_state()
+            await update_admin_order(uid, None)
+            await message.answer(
+                f"✅ Հեռախոսահամարը ստացվեց։\n\n"
+                f"📱 {operator}\n"
+                f"📞 {text}\n\n"
+                f"⏳ Ադմինը կկատարի վերադարձը։",
+                reply_markup=main_kb()
+            )
+            return
 
+    # ⭐ GAME ID / USERNAME
     if u.get("game_id_waiting"):
         if not text:
             await message.answer("❌ ID / Username-ը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ Game ID / Username-ը։")
@@ -784,6 +860,7 @@ async def text_input(message: Message):
         )
         return
 
+    # ⭐ GAME PASSWORD
     if u.get("game_password_waiting"):
         if not text:
             await message.answer("❌ Պասսվորդը դատարկ է։\n\n✏️ Ուղարկիր ճիշտ պասսվորդը։")
@@ -803,6 +880,7 @@ async def text_input(message: Message):
         )
         return
 
+    # ⭐ 2FA CODE
     if u.get("verification_code_waiting"):
         if len(text) == 6 and text.isdigit():
             u["verification_code_waiting"] = False
@@ -842,7 +920,10 @@ async def contact_open(c: CallbackQuery):
         reply_markup=back_main_kb()
     )
 
+# ============================================
 # ⭐ BRAWL PASS ADMIN
+# ============================================
+
 @dp.callback_query(F.data.startswith("bpset:"))
 async def bp_set_price(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -916,7 +997,10 @@ async def bp_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_bp_kb(uid, u["product"]))
     await safe_answer(c, "❌ Screenshot-ը մերժվեց, սպասվում է նորը")
 
-# ⭐ RECEIPT_ACCEPT
+# ============================================
+# ⭐ ՉԵԿ
+# ============================================
+
 @dp.callback_query(F.data.startswith("receipt:accept:"))
 async def receipt_accept(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -943,7 +1027,6 @@ async def receipt_accept(c: CallbackQuery):
     await send_client(uid, "✅ Վճարման չեկը հաստատվեց։\n\n⏳ Սպասիր ադմինի կողմից պատվերի շարունակությանը։")
     await safe_answer(c, "✅ Չեկը հաստատվեց")
 
-# ⭐ RECEIPT_REJECT
 @dp.callback_query(F.data.startswith("receipt:reject:"))
 async def receipt_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -961,7 +1044,7 @@ async def receipt_reject(c: CallbackQuery):
     await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c, "❌ Չեկը մերժվեց")
 
-# ⭐ RECEIPT_BAD
+# ⭐ ՉԵԿԸ ՎԱՏ Է ԵՐԵՎՈՒՄ - ՉԻ ՋՆՋՈՒՄ ID-Ն ՈՒ ՊԱՍՍՎՈՐԴԸ
 @dp.callback_query(F.data.startswith("receipt:bad:"))
 async def receipt_bad(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -971,6 +1054,7 @@ async def receipt_bad(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
     
+    # ⭐ ՄԻԱՅՆ ՉԵԿ, ID-Ն ՈՒ ՊԱՍՍՎՈՐԴԸ ՉԵՆ ՋՆՋՎՈՒՄ
     u["receipt_waiting"] = True
     u["receipt_accepted"] = False
     u["status"] = "📸 Սպասվում է նոր չեկ (վատ որակ)"
@@ -984,14 +1068,18 @@ async def receipt_bad(c: CallbackQuery):
         "• պարզ է և առանց լղոզման\n"
         "• ամբողջական (երևում է ամբողջ չեկը)\n"
         "• լավ լուսավորված\n\n"
-        "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։",
+        "📸 Պարզապես ուղարկիր նոր screenshot-ը այս chat-ում։\n\n"
+        "✅ ID / Username-ը և պասսվորդը արդեն մուտքագրված են, նորից մուտքագրել պետք չէ։",
         back_main_kb()
     )
     
     await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c, "📸 Կլիենտին խնդրեցինք նոր չեկ ուղարկել")
 
+# ============================================
 # ⭐ ADMIN ID REJECT
+# ============================================
+
 @dp.callback_query(F.data.startswith("id:reject:"))
 async def admin_id_reject(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1056,6 +1144,106 @@ async def admin_receipt_back(c: CallbackQuery):
     await update_admin_order(uid, admin_receipt_kb(uid))
     await safe_answer(c)
 
+# ============================================
+# ⭐ ՎԵՐԱԴԱՐՁ (REFUND)
+# ============================================
+
+@dp.callback_query(F.data.startswith("refund:"))
+async def refund_action(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    parts = c.data.split(":")
+    uid = int(parts[-1])
+    u = get_user(uid)
+    
+    # ⭐ ԱԴՄԻՆԸ ԸՆՏՐԵԼ Է ՎԵՐԱԴԱՐՁ
+    if len(parts) == 2:
+        u["refund_waiting"] = True
+        u["refund_method"] = None
+        u["refund_operator"] = None
+        u["refund_details"] = None
+        u["status"] = "💸 Սպասվում է վերադարձի եղանակի ընտրություն"
+        await save_state()
+        await update_admin_order(uid, admin_refund_kb(uid))
+        await send_client(
+            uid,
+            "💸 <b>Վերադարձ</b>\n\n"
+            "Ընտրիր վերադարձի եղանակը՝\n\n"
+            "💳 <b>Քարտով</b> - ուղարկիր քարտի համարը\n"
+            "💵 <b>Telcell-ով</b> - ընտրիր օպերատորը և ուղարկիր հեռախոսահամարը",
+            admin_refund_kb(uid)
+        )
+        await safe_answer(c)
+        return
+    
+    # ⭐ ԿԼԻԵՆՏԸ ԸՆՏՐԵԼ Է ՔԱՐՏՈՎ
+    if parts[1] == "card":
+        u["refund_method"] = "Քարտ"
+        u["refund_operator"] = None
+        u["refund_waiting"] = True
+        u["status"] = "💸 Սպասվում է քարտի համար"
+        await save_state()
+        await update_admin_order(uid, None)
+        await send_client(
+            uid,
+            "💳 <b>Քարտով վերադարձ</b>\n\n"
+            "✏️ ՈՒՂԱՐԿԻՐ քարտի համարը\n"
+            "📝 Օրինակ՝ 1234 5678 9012 3456\n\n"
+            "⚠️ Համոզվիր, որ համարը ճիշտ է։",
+            back_main_kb()
+        )
+        await safe_answer(c, "⏳ Սպասվում է քարտի համար")
+        return
+    
+    # ⭐ ԿԼԻԵՆՏԸ ԸՆՏՐԵԼ Է TELCELL
+    if parts[1] == "telcell":
+        u["refund_method"] = "Telcell"
+        u["refund_operator"] = None
+        u["refund_waiting"] = True
+        u["status"] = "💸 Սպասվում է օպերատորի ընտրություն"
+        await save_state()
+        await update_admin_order(uid, None)
+        await send_client(
+            uid,
+            "💵 <b>Telcell-ով վերադարձ</b>\n\n"
+            "📱 Ընտրիր օպերատորը՝\n\n"
+            "• Beeline\n"
+            "• Ucom\n"
+            "• MTS\n"
+            "• Viva-MTS\n"
+            "• Team\n\n"
+            "⚠️ Ընտրիր ճիշտ օպերատոր, որպեսզի գումարը ճիշտ հասնի։",
+            operator_kb(uid)
+        )
+        await safe_answer(c, "⏳ Սպասվում է օպերատորի ընտրություն")
+        return
+    
+    # ⭐ ԿԼԻԵՆՏԸ ԸՆՏՐԵԼ Է ՕՊԵՐԱՏՈՐ
+    if parts[1] == "operator":
+        uid = int(parts[2])
+        operator = parts[3]
+        u = get_user(uid)
+        u["refund_operator"] = operator
+        u["status"] = f"💸 Սպասվում է հեռախոսահամար ({operator})"
+        await save_state()
+        await update_admin_order(uid, None)
+        await send_client(
+            uid,
+            f"📱 <b>Օպերատոր՝ {operator}</b>\n\n"
+            f"✏️ ՈՒՂԱՐԿԻՐ հեռախոսահամարը\n"
+            f"📝 Օրինակ՝ 077 123456\n\n"
+            f"⚠️ Համոզվիր, որ համարը ճիշտ է։",
+            back_main_kb()
+        )
+        await safe_answer(c, f"⏳ Սպասվում է հեռախոսահամար ({operator})")
+        return
+
+# ============================================
+# ⭐ ԱՎԱՐՏԵԼ ՊԱՏՎԵՐԸ
+# ============================================
+
 @dp.callback_query(F.data.startswith("order:complete:"))
 async def order_complete(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1066,7 +1254,7 @@ async def order_complete(c: CallbackQuery):
     u = get_user(uid)
     
     if not u.get("verification_done"):
-        u["verification_type"] = "Пропущено"
+        u["verification_type"] = "Բաց թողնված"
         u["verification_done"] = True
     
     order_id = u.get("order_id")
@@ -1112,61 +1300,9 @@ async def order_complete(c: CallbackQuery):
     )
     await safe_answer(c, "✅ Պատվերը ավարտվեց")
 
-@dp.callback_query(F.data.startswith("refund:"))
-async def refund_action(c: CallbackQuery):
-    if c.from_user.id != ADMIN_ID:
-        await safe_answer(c, "Մուտքը արգելված է")
-        return
-    
-    parts = c.data.split(":")
-    uid = int(parts[-1])
-    u = get_user(uid)
-    
-    if len(parts) == 2:
-        u["refund_waiting"] = True
-        u["status"] = "💸 Սպասվում են վերադարձի տվյալներ"
-        await save_state()
-        await update_admin_order(uid, admin_refund_kb(uid))
-        await send_client(uid, "💸 Վերադարձ\n\nՈւղարկիր այն տվյալները, որոնցով պետք է կատարվի վերադարձը։")
-        await safe_answer(c)
-        return
-    
-    method = "Քարտ" if parts[1] == "card" else "Telcell"
-    u["refund_method"] = method
-    u["status"] = "💸 Վերադարձ"
-    u["is_completed"] = True
-    u["completed_at"] = datetime.datetime.now().isoformat()
-    
-    order_id = u.get("order_id")
-    username = u.get("username")
-    product = u.get("product")
-    price = u.get("price")
-    
-    u["game_id"] = None
-    u["game_password"] = None
-    u["payment"] = None
-    u["receipt_file_id"] = None
-    u["receipt_accepted"] = False
-    u["game_id_waiting"] = False
-    u["game_password_waiting"] = False
-    u["receipt_waiting"] = False
-    
-    await save_state()
-    await update_admin_order(uid, None)
-    
-    await send_client(
-        uid,
-        f"💸 Վերադարձ\n\n"
-        f"📦 Պատվեր՝ #{escape(str(order_id or '—'))}\n"
-        f"👤 Username՝ @{escape(str(username or 'չկա'))}\n"
-        f"💎 Ապրանք՝ {escape(str(product or '—'))}\n"
-        f"💰 Գին՝ {fmt(price or 0)} ֏\n\n"
-        f"📌 Կարգավիճակ՝ 💸 Վերադարձ\n\n"
-        f"Եղանակ՝ <b>{method}</b>\n\n"
-        f"Շնորհակալություն Games Vault Shop-ը ընտրելու համար։",
-        main_kb()
-    )
-    await safe_answer(c, "💸 Վերադարձը նշվեց")
+# ============================================
+# ⭐ 2FA
+# ============================================
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
 async def verify_menu(c: CallbackQuery):
@@ -1227,11 +1363,7 @@ async def verify_device(c: CallbackQuery):
         back_main_kb()
     )
     
-    await c.message.edit_text(
-        "✅ 2FA՝ Այլ սարքով հաստատում — հրահանգը ուղարկվեց клиенту\n\n"
-        "🛠 Ադմինի վահանակ\n\nԸնտրիր գործողությունը՝",
-        reply_markup=admin_main_kb(uid)
-    )
+    await update_admin_order(uid, admin_main_kb(uid))
     await safe_answer(c, "✅ 2FA՝ Այլ սարք — հրահանգը ուղարկվեց")
 
 @dp.callback_query(F.data.startswith("verify:auth:"))
@@ -1304,72 +1436,17 @@ async def verify_email(c: CallbackQuery):
     )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
 
-@dp.callback_query(F.data.startswith("verify:retry:"))
-async def verify_retry(c: CallbackQuery):
-    if c.from_user.id != ADMIN_ID:
-        await safe_answer(c, "Մուտքը արգելված է")
-        return
-    
-    parts = c.data.split(":")
-    uid = int(parts[2])
-    verify_type = parts[3]
-    u = get_user(uid)
-    
-    u["verification_attempts"] = 0
-    u["verification_code_waiting"] = True
-    u["verification_done"] = False
-    u["status"] = f"⏳ Սպասվում է նոր {verify_type} կոդ"
-    await save_state()
-    
-    if verify_type == "auth":
-        await send_client_photo(
-            uid,
-            VERIFY_IMAGES["auth"],
-            "🔄 Մուտքագրիր նոր 2FA կոդ — Authenticator\n\n"
-            "1️⃣ Բացիր Google Authenticator / Microsoft Authenticator\n"
-            "2️⃣ Գտիր Roblox-ի 6-նիշանի կոդը\n"
-            "3️⃣ Մուտքագրիր նոր կոդը այս chat-ում\n\n"
-            "⚠️ Կարևոր. Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
-            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
-            back_main_kb()
-        )
-    elif verify_type == "email":
-        await send_client_photo(
-            uid,
-            VERIFY_IMAGES["email"],
-            "🔄 Մուտքագրիր նոր 2FA կոդ — E-mail\n\n"
-            "1️⃣ Ստուգիր քո E-mail-ը (Gmail, Mail.ru, և այլն)\n"
-            "2️⃣ Roblox-ը ուղարկել է նոր 6-նիշանի կոդ\n"
-            "3️⃣ Մուտքագրիր նոր կոդը այս chat-ում\n\n"
-            "⚠️ Կարևոր. Ստուգիր նաև Spam պանակը։\n\n"
-            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
-            back_main_kb()
-        )
-    
-    await c.message.edit_text(
-        "🔄 Նոր 2FA կոդը ուղարկվեց клиенту\n\n"
-        "⏳ Սպասում ենք նոր կոդի մուտքագրմանը...\n\n"
-        "🛠 Ադմինի վահանակ",
-        reply_markup=admin_main_kb(uid)
-    )
-    await safe_answer(c, "🔄 Նոր կոդը ուղարկվեց клиенту")
-
-@dp.message(Command("admin"))
-async def admin_cmd(message: Message):
-    if message.from_user.id == ADMIN_ID:
-        await message.answer("🛠 Admin panel\n\nԲոտը աշխատում է։")
+# ============================================
+# ⭐ ԳՈՐԾԱՐԿՈՒՄ
+# ============================================
 
 async def main():
     load_state()
-    await save_bans()
     asyncio.create_task(clean_old_orders())
-    await asyncio.gather(
-        dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types()),
-        run_web()
-    )
+    asyncio.create_task(run_web())
+    
+    logger.info("🚀 Բոտը գործարկվեց")
+    await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped")
+    asyncio.run(main())
