@@ -716,14 +716,20 @@ async def back_payment(c: CallbackQuery):
         reply_markup=payment_kb()
     )
 
-# ⭐ ՖՈՏՈԻ ՄՇԱԿՈՒՄ
+# ============================================
+# ⭐ ՖՈՏՈԻ ՄՇԱԿՈՒՄ (ՇՏԿՎԱԾ)
+# ============================================
+
 @dp.message(F.photo)
 async def photo_input(message: Message):
     uid = message.from_user.id
     u = get_user(uid)
     file_id = message.photo[-1].file_id
     
-    # Brawl Pass screenshot
+    # ⭐ LOG FOR DEBUG
+    logger.info(f"📸 Photo from {uid}: order_id={u.get('order_id')}, price={u.get('price')}, receipt_waiting={u.get('receipt_waiting')}, game_id={u.get('game_id')}, game_id_waiting={u.get('game_id_waiting')}")
+    
+    # 1. Brawl Pass screenshot
     if u.get("brawl_pass_waiting") and u.get("brawl_pass_product"):
         product_name = u["brawl_pass_product"]
         u["brawl_pass_screenshot_file_id"] = file_id
@@ -740,16 +746,18 @@ async def photo_input(message: Message):
         )
         return
     
+    # 2. Ստուգում ենք՝ արդյոք կա order_id
     if not u.get("order_id"):
         await message.answer("⏳ Դուք դեռ չեք սկսել գնումը։\n\nԸնտրիր ապրանքը գլխավոր մենյուից։", reply_markup=main_kb())
         return
     
+    # 3. Ստուգում ենք՝ արդյոք կա price
     if not u.get("price"):
         await message.answer("⏳ Գինը դեռ ընտրված չէ։ Սպասիր ադմինի որոշմանը։", reply_markup=back_main_kb())
         return
     
-    # ⭐ ՉԵԿ (ID-ն ու պասսվորդը ՉԵՆ ՋՆՋՎՈՒՄ)
-    if u.get("receipt_waiting"):
+    # 4. ⭐ Եթե արդեն կա ID (game_id) և սպասում ենք նոր չեկի
+    if u.get("receipt_waiting") and u.get("game_id"):
         u["receipt_file_id"] = file_id
         u["receipt_accepted"] = False
         u["receipt_waiting"] = False
@@ -763,21 +771,30 @@ async def photo_input(message: Message):
         )
         return
     
-    # ⭐ ԱՌԱՋԻՆ ՉԵԿ
-    u["receipt_file_id"] = file_id
-    u["receipt_accepted"] = False
-    u["status"] = "⏳ Սպասվում է ID"
-    u["game_id_waiting"] = True
-    u["receipt_waiting"] = False
-    new_order(u, message.from_user)
+    # 5. ⭐ ԱՌԱՋԻՆ ՉԵԿ (եթե ID-ն դեռ չկա)
+    if not u.get("game_id") and not u.get("game_id_waiting"):
+        u["receipt_file_id"] = file_id
+        u["receipt_accepted"] = False
+        u["status"] = "⏳ Սպասվում է ID"
+        u["game_id_waiting"] = True
+        u["receipt_waiting"] = False
+        new_order(u, message.from_user)
+        
+        await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
+        await message.answer(
+            "📸 Չեկը ստացվեց: ✅\n\n"
+            "✏️ ԱՅԺՄ ԳՐԻՐ քո Game ID / Username-ը\n"
+            "Օրինակ՝ Player123 կամ @nick\n\n"
+            "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
+            reply_markup=back_main_kb()
+        )
+        return
     
-    await create_or_replace_order(uid, file_id, admin_id_reject_kb(uid))
+    # 6. Եթե որևէ այլ դեպք
     await message.answer(
-        "📸 Չեկը ստացվեց: ✅\n\n"
-        "✏️ ԱՅԺՄ ԳՐԻՐ քո Game ID / Username-ը\n"
-        "Օրինակ՝ Player123 կամ @nick\n\n"
-        "📤 Պարզապես ուղարկիր տեքստը այս chat-ում:",
-        reply_markup=back_main_kb()
+        "❌ Չհաջողվեց մշակել ձեր լուսանկարը։\n\n"
+        "Խնդրում ենք սկսել նոր պատվեր /cancel հրամանով։",
+        reply_markup=main_kb()
     )
 
 # ⭐ ՏԵՔՍՏԻ ՄՇԱԿՈՒՄ
