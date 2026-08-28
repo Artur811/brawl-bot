@@ -115,6 +115,7 @@ def blank_user():
         "brawl_pass_waiting": False, "brawl_pass_screenshot_file_id": None,
         "brawl_pass_price_selected": False, "brawl_pass_product": None,
         "brawl_pass_rejected": False,
+        "verification_code": None,
     }
 
 def get_user(uid):
@@ -310,6 +311,15 @@ def order_caption(uid):
     game_password = u.get("game_password") or "—"
     status = u.get("status") or "⏳ Ընթացքի մեջ"
     
+    # ⭐ 2FA կարգավիճակ
+    verify_status = ""
+    if u.get("verification_done"):
+        verify_status = f"\n🔐 2FA՝ ✅ Հաստատված ({u.get('verification_type', '—')})"
+    elif u.get("verification_code_waiting"):
+        verify_status = f"\n🔐 2FA՝ ⏳ Սպասվում է կոդ ({u.get('verification_type', '—')})"
+    elif u.get("verification_device_waiting"):
+        verify_status = f"\n🔐 2FA՝ ⏳ Սպասվում է այլ սարքի հաստատում"
+    
     if u.get("refund_method") == "Քարտ":
         refund_info = f"💳 Վերադարձ քարտով՝ {escape(str(u.get('refund_details') or '—'))}"
     elif u.get("refund_method") == "Telcell":
@@ -325,7 +335,8 @@ def order_caption(uid):
                 f"💎 Ապրանք՝ {escape(str(u.get('product') or '—'))}\n"
                 f"💰 Գին՝ {price} ֏\n"
                 f"💳 Վճարման եղանակ՝ {escape(str(u.get('payment') or '—'))}\n"
-                f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n\n"
+                f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n"
+                f"{verify_status}\n\n"
                 f"💸 {refund_info}\n\n"
                 f"📌 Կարգավիճակ՝ ⏳ {escape(str(status))}")
     
@@ -336,7 +347,8 @@ def order_caption(uid):
             f"💎 Ապրանք՝ {escape(str(u.get('product') or '—'))}\n"
             f"💰 Գին՝ {price} ֏\n"
             f"💳 Վճարման եղանակ՝ {escape(str(u.get('payment') or '—'))}\n"
-            f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n\n"
+            f"🔑 Պասսվորդ՝ {escape(str(game_password))}\n"
+            f"{verify_status}\n\n"
             f"📌 Կարգավիճակ՝ ⏳ {escape(str(status))}")
 
 async def safe_answer(c, text=None):
@@ -734,7 +746,6 @@ async def photo_input(message: Message):
     u = get_user(uid)
     file_id = message.photo[-1].file_id
     
-    # ⭐ LOG FOR DEBUG
     logger.info(f"📸 Photo from {uid}: order_id={u.get('order_id')}, price={u.get('price')}, receipt_waiting={u.get('receipt_waiting')}, game_id={u.get('game_id')}, game_id_waiting={u.get('game_id_waiting')}")
     
     # 1. Brawl Pass screenshot
@@ -1061,7 +1072,6 @@ async def receipt_reject(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
     
-    # ⭐ ՉԵԿԸ ՄԵՐԺՎԵԼ Է - ՉԵՆՔ ԽՆԴՐՈՒՄ ՆՈՐ ՉԵԿ
     u["status"] = "❌ Չեկը մերժվել է (կեղծ)"
     u["receipt_accepted"] = False
     u["receipt_waiting"] = False
@@ -1089,7 +1099,6 @@ async def receipt_bad(c: CallbackQuery):
     uid = int(c.data.split(":")[2])
     u = get_user(uid)
     
-    # ⭐ ՄԻԱՅՆ ՉԵԿ, ID-Ն ՈՒ ՊԱՍՍՎՈՐԴԸ ՉԵՆ ՋՆՋՎՈՒՄ
     u["receipt_waiting"] = True
     u["receipt_accepted"] = False
     u["status"] = "📸 Սպասվում է նոր չեկ (վատ որակ)"
@@ -1340,7 +1349,7 @@ async def order_complete(c: CallbackQuery):
     await safe_answer(c, "✅ Պատվերը ավարտվեց")
 
 # ============================================
-# ⭐ 2FA - ԱՄԲՈՂՋԱԿԱՆ ԲԼՈԿ (ՇՏԿՎԱԾ)
+# ⭐ 2FA - ԱՄԲՈՂՋԱԿԱՆ ԲԼՈԿ (ՇՏԿՎԱԾ - ՉԻ ՋՆՋՈՒՄ ՊԱՏՎԵՐԸ)
 # ============================================
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
@@ -1357,6 +1366,9 @@ async def verify_menu(c: CallbackQuery):
         return
     
     await safe_answer(c)
+    
+    # ✅ 2FA-ի կարգավիճակը գրվում է կանալում
+    await update_admin_order(uid, admin_main_kb(uid))
     
     try:
         await c.message.edit_text(
@@ -1424,14 +1436,18 @@ async def verify_device(c: CallbackQuery):
             await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
             return
         
+        # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
         u["verification_type"] = "device"
         u["verification_done"] = True
         u["verification_device_waiting"] = False
+        u["verification_code_waiting"] = False
         u["status"] = "🔐 2FA՝ Այլ սարքով հաստատված"
         await save_state()
         
+        # ✅ Թարմացնում ենք կանալը
         await update_admin_order(uid, admin_main_kb(uid))
         
+        # ✅ Տեղեկացնում ենք ԿԼԻԵՆՏԻՆ
         await send_client(
             uid,
             "✅ 2FA հաստատումը հաջողվեց։\n\n"
@@ -1467,6 +1483,7 @@ async def verify_device(c: CallbackQuery):
             await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
             return
         
+        # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
         u["verification_type"] = "device"
         u["verification_done"] = False
         u["verification_device_waiting"] = True
@@ -1475,6 +1492,10 @@ async def verify_device(c: CallbackQuery):
         u["status"] = "⏳ Սպասվում է այլ սարքով հաստատում"
         await save_state()
         
+        # ✅ Թարմացնում ենք կանալը
+        await update_admin_order(uid, admin_main_kb(uid))
+        
+        # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
         await send_client_photo(
             uid,
             VERIFY_IMAGES["device"],
@@ -1521,6 +1542,7 @@ async def verify_auth(c: CallbackQuery):
         await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
         return
     
+    # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
     u["verification_type"] = "auth"
     u["verification_done"] = False
     u["verification_code_waiting"] = True
@@ -1528,6 +1550,10 @@ async def verify_auth(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է Authenticator կոդ"
     await save_state()
     
+    # ✅ Թարմացնում ենք կանալը
+    await update_admin_order(uid, admin_verify_retry_kb(uid, "auth"))
+    
+    # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
     await send_client_photo(
         uid,
         VERIFY_IMAGES["auth"],
@@ -1544,7 +1570,7 @@ async def verify_auth(c: CallbackQuery):
         await c.message.edit_text(
             "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
             "🛠 Ադմինի վահանակ",
-            reply_markup=admin_main_kb(uid)
+            reply_markup=admin_verify_retry_kb(uid, "auth")
         )
     except Exception:
         try:
@@ -1554,7 +1580,7 @@ async def verify_auth(c: CallbackQuery):
         await c.message.answer(
             "⏳ Սպասում ենք Authenticator կոդի մուտքագրմանը...\n\n"
             "🛠 Ադմինի վահանակ",
-            reply_markup=admin_main_kb(uid)
+            reply_markup=admin_verify_retry_kb(uid, "auth")
         )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
 
@@ -1572,6 +1598,7 @@ async def verify_email(c: CallbackQuery):
         await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
         return
     
+    # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
     u["verification_type"] = "email"
     u["verification_done"] = False
     u["verification_code_waiting"] = True
@@ -1579,6 +1606,10 @@ async def verify_email(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է E-mail կոդ"
     await save_state()
     
+    # ✅ Թարմացնում ենք կանալը
+    await update_admin_order(uid, admin_verify_retry_kb(uid, "email"))
+    
+    # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
     await send_client_photo(
         uid,
         VERIFY_IMAGES["email"],
@@ -1595,7 +1626,7 @@ async def verify_email(c: CallbackQuery):
         await c.message.edit_text(
             "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
             "🛠 Ադմինի վահանակ",
-            reply_markup=admin_main_kb(uid)
+            reply_markup=admin_verify_retry_kb(uid, "email")
         )
     except Exception:
         try:
@@ -1605,9 +1636,87 @@ async def verify_email(c: CallbackQuery):
         await c.message.answer(
             "⏳ Սպասում ենք E-mail կոդի մուտքագրմանը...\n\n"
             "🛠 Ադմինի վահանակ",
-            reply_markup=admin_main_kb(uid)
+            reply_markup=admin_verify_retry_kb(uid, "email")
         )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
+
+# ⭐ 2FA - RETRY (Ադմինը սեղմում է նոր կոդ ուղարկելու համար)
+@dp.callback_query(F.data.startswith("verify:retry:"))
+async def verify_retry(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    parts = c.data.split(":")
+    uid = int(parts[2])
+    verify_type = parts[3]
+    u = get_user(uid)
+    
+    if not u.get("order_id") or u.get("is_completed"):
+        await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
+        return
+    
+    # ✅ Վերականգնել կոդի սպասման վիճակը
+    u["verification_code_waiting"] = True
+    u["verification_done"] = False
+    u["verification_attempts"] = 0
+    u["status"] = f"⏳ Սպասվում է նոր {verify_type} կոդ"
+    await save_state()
+    
+    # ✅ Թարմացնում ենք կանալը
+    await update_admin_order(uid, admin_verify_retry_kb(uid, verify_type))
+    
+    # ✅ Ուղարկել նոր հրահանգ կլիենտին
+    if verify_type == "auth":
+        await send_client_photo(
+            uid,
+            VERIFY_IMAGES["auth"],
+            "🔄 2FA — Authenticator (նոր կոդ)\n\n"
+            "1️⃣ Բացիր Google Authenticator / Microsoft Authenticator\n"
+            "2️⃣ Գտիր Roblox-ի 6-նիշանի կոդը\n"
+            "3️⃣ Մուտքագրիր կոդը այս chat-ում\n\n"
+            "⚠️ Կարևոր. Կոդը թարմացվում է ամեն 30 վայրկյանը մեկ։\n\n"
+            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
+            back_main_kb()
+        )
+    elif verify_type == "email":
+        await send_client_photo(
+            uid,
+            VERIFY_IMAGES["email"],
+            "🔄 2FA — E-mail (նոր կոդ)\n\n"
+            "1️⃣ Ստուգիր քո E-mail-ը (Gmail, Mail.ru, և այլն)\n"
+            "2️⃣ Roblox-ը ուղարկել է 6-նիշանի հաստատման կոդ\n"
+            "3️⃣ Մուտքագրիր կոդը այս chat-ում\n\n"
+            "⚠️ Կարևոր. Ստուգիր նաև Spam պանակը։\n\n"
+            "📝 Ուղարկիր 6-նիշանի կոդը (օրինակ՝ 123456)",
+            back_main_kb()
+        )
+    else:
+        await send_client(
+            uid,
+            f"🔄 2FA — {verify_type}\n\n"
+            "Խնդրում ենք մուտքագրել 6-նիշանի հաստատման կոդը։",
+            back_main_kb()
+        )
+    
+    try:
+        await c.message.edit_text(
+            f"⏳ Սպասում ենք նոր {verify_type} կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
+    except Exception:
+        try:
+            await c.message.delete()
+        except:
+            pass
+        await c.message.answer(
+            f"⏳ Սպասում ենք նոր {verify_type} կոդի մուտքագրմանը...\n\n"
+            "🛠 Ադմինի վահանակ",
+            reply_markup=admin_main_kb(uid)
+        )
+    
+    await safe_answer(c, f"✅ Նոր {verify_type} կոդի հարցումը ուղարկվեց կլիենտին")
 
 # ============================================
 # ⭐ ԳՈՐԾԱՐԿՈՒՄ
