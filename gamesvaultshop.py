@@ -63,7 +63,7 @@ banned_users = set()
 state_lock = asyncio.Lock()
 order_stats = defaultdict(int)
 
-# ⭐ STARTUP - ԱՎՏՈՄԱՏ ՈՒՂԱՐԿՈՒՄ ՀՐԱՎԵՐԻ ՀՂՈՒՄ
+# ⭐ STARTUP
 @dp.startup()
 async def on_startup():
     try:
@@ -71,35 +71,6 @@ async def on_startup():
         logger.info("✅ Webhook-ը ջնջվեց")
     except Exception as e:
         logger.warning(f"Webhook-ի ջնջումը ձախողվեց: {e}")
-    
-    # ✅ ԱՎՏՈՄԱՏ ՈՒՂԱՐԿԵԼ ՀՐԱՎԵՐԻ ՀՂՈՒՄԸ
-    try:
-        chat_id = int(SUPPORT_CHANNEL_ID) if SUPPORT_CHANNEL_ID else ADMIN_ID
-        
-        invite_link = await bot.create_chat_invite_link(
-            chat_id=chat_id,
-            member_limit=1,
-            expire_date=None
-        )
-        
-        await bot.send_message(
-            ADMIN_ID,
-            f"🚀 <b>Բոտը գործարկվեց</b>\n\n"
-            f"🔗 <b>Հրավերի հղում</b>\n\n"
-            f"{invite_link.invite_link}\n\n"
-            f"📌 Սեղմիր հղման վրա՝ խմբին միանալու համար:"
-        )
-        
-        logger.info(f"✅ Invite link sent to admin: {invite_link.invite_link}")
-        
-    except Exception as e:
-        logger.error(f"Failed to send invite link: {e}")
-        await bot.send_message(
-            ADMIN_ID,
-            f"❌ <b>Չհաջողվեց ստեղծել հրավերի հղում</b>\n\n"
-            f"Սխալ՝ {e}\n\n"
-            f"📌 Ստուգիր, արդյոք SUPPORT_CHANNEL_ID-ը ճիշտ է:"
-        )
 
 # ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
 GAME_EMOJIS = {
@@ -279,7 +250,6 @@ def admin_receipt_kb(uid):
 def admin_main_kb(uid):
     return kb([
         [InlineKeyboardButton(text="🔐 2FA հաստատում", callback_data=f"verify:menu:{uid}")],
-        [InlineKeyboardButton(text="🔗 Հրավերի հղում", callback_data=f"invite:link:{uid}")],
         [InlineKeyboardButton(text="❌ Սխալ ID / Username", callback_data=f"id:reject:{uid}"),
          InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")],
         [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
@@ -517,67 +487,6 @@ async def run_web():
     logger.info("✅ Health server started on port %s", PORT)
     while True:
         await asyncio.sleep(3600)
-
-# ============================================
-# ⭐ /INVITE ՀՐԱՄԱՆ
-# ============================================
-
-@dp.message(Command("invite"))
-async def invite_command(message: Message):
-    uid = message.from_user.id
-    
-    if uid != ADMIN_ID:
-        await message.answer("❌ Մուտքը արգելված է")
-        return
-    
-    try:
-        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
-        
-        invite_link = await bot.create_chat_invite_link(
-            chat_id=chat_id,
-            member_limit=1,
-            expire_date=None
-        )
-        
-        await message.answer(
-            f"🔗 <b>Հրավերի հղում</b>\n\n"
-            f"{invite_link.invite_link}\n\n"
-            f"📌 Այս հղումով կարող ես միանալ խմբին:",
-            reply_markup=back_main_kb()
-        )
-    except Exception as e:
-        await message.answer(f"❌ Սխալ: {e}")
-
-# ============================================
-# ⭐ INVITE LINK CALLBACK (Ադմինի վահանակից)
-# ============================================
-
-@dp.callback_query(F.data.startswith("invite:link:"))
-async def invite_link_callback(c: CallbackQuery):
-    if c.from_user.id != ADMIN_ID:
-        await safe_answer(c, "Մուտքը արգելված է")
-        return
-    
-    uid = int(c.data.split(":")[2])
-    
-    try:
-        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
-        
-        invite_link = await bot.create_chat_invite_link(
-            chat_id=chat_id,
-            member_limit=1,
-            expire_date=None
-        )
-        
-        await c.message.answer(
-            f"🔗 <b>Հրավերի հղում</b>\n\n"
-            f"{invite_link.invite_link}\n\n"
-            f"📌 Այս հղումով կարող ես միանալ խմբին:",
-            reply_markup=back_main_kb()
-        )
-        await safe_answer(c, "✅ Հղումը ուղարկվեց")
-    except Exception as e:
-        await safe_answer(c, f"❌ Սխալ: {e}")
 
 # ============================================
 # ⭐ ՀԻՄՆԱԿԱՆ ՀԵՆԴԼԵՐՆԵՐ
@@ -936,14 +845,34 @@ async def text_input(message: Message):
 
     # ⭐ SUPPORT
     if u.get("support_waiting"):
-        if SUPPORT_CHANNEL_ID:
+        support_chat_id = int(SUPPORT_CHANNEL_ID) if SUPPORT_CHANNEL_ID else ADMIN_ID
+        try:
             await bot.send_message(
-                int(SUPPORT_CHANNEL_ID),
-                f"📩 Support\n👤 {uid}\n@{escape(message.from_user.username or 'չկա')}\n\n{escape(text)}"
+                support_chat_id,
+                f"📩 <b>Support</b>\n\n"
+                f"👤 ID: <code>{uid}</code>\n"
+                f"👤 Username: @{escape(message.from_user.username or 'չկա')}\n"
+                f"📝 Հաղորդագրություն:\n\n"
+                f"{escape(text)}"
             )
+            await bot.send_message(
+                ADMIN_ID,
+                f"📩 <b>Support</b>\n\n"
+                f"👤 ID: <code>{uid}</code>\n"
+                f"👤 Username: @{escape(message.from_user.username or 'չկա')}\n"
+                f"📝 Հաղորդագրություն:\n\n"
+                f"{escape(text)}"
+            )
+        except Exception as e:
+            logger.error(f"Support send failed: {e}")
+        
         u["support_waiting"] = False
         await save_state()
-        await message.answer("✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։", reply_markup=main_kb())
+        await message.answer(
+            "✅ Հաղորդագրությունը ուղարկվեց աջակցությանը։\n\n"
+            "⏳ Մենք կպատասխանենք շուտով։",
+            reply_markup=main_kb()
+        )
         return
 
     # ⭐ ՎԵՐԱԴԱՐՁ - ԸՆԴՈՒՆՈՒՄ
@@ -1054,12 +983,15 @@ async def text_input(message: Message):
 
 @dp.callback_query(F.data == "contact:open")
 async def contact_open(c: CallbackQuery):
-    u = get_user(c.from_user.id)
+    uid = c.from_user.id
+    u = get_user(uid)
     u["support_waiting"] = True
     await save_state()
     await safe_answer(c)
     await c.message.edit_text(
-        "📩 Կապ Games Vault Shop-ի հետ\n\nՈւղարկիր հաղորդագրություն, և մենք կպատասխանենք։",
+        "📩 <b>Կապ Games Vault Shop-ի հետ</b>\n\n"
+        "✏️ Ուղարկիր հաղորդագրություն, և մենք կպատասխանենք։\n\n"
+        "⚠️ Քո պատվերը կմնա անփոփոխ։",
         reply_markup=back_main_kb()
     )
 
@@ -1296,7 +1228,7 @@ async def admin_receipt_back(c: CallbackQuery):
     await safe_answer(c)
 
 # ============================================
-# ⭐ ՎԵՐԱԴԱՐՁ (REFUND) - ՇՏԿՎԱԾ
+# ⭐ ՎԵՐԱԴԱՐՁ (REFUND)
 # ============================================
 
 @dp.callback_query(F.data.startswith("refund:"))
