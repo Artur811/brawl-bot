@@ -74,7 +74,7 @@ async def on_startup():
     
     # ✅ ԱՎՏՈՄԱՏ ՈՒՂԱՐԿԵԼ ՀՐԱՎԵՐԻ ՀՂՈՒՄԸ
     try:
-        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
+        chat_id = int(SUPPORT_CHANNEL_ID) if SUPPORT_CHANNEL_ID else ADMIN_ID
         
         invite_link = await bot.create_chat_invite_link(
             chat_id=chat_id,
@@ -98,7 +98,7 @@ async def on_startup():
             ADMIN_ID,
             f"❌ <b>Չհաջողվեց ստեղծել հրավերի հղում</b>\n\n"
             f"Սխալ՝ {e}\n\n"
-            f"📌 Ստուգիր, արդյոք ORDER_CHANNEL_ID-ը ճիշտ է:"
+            f"📌 Ստուգիր, արդյոք SUPPORT_CHANNEL_ID-ը ճիշտ է:"
         )
 
 # ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
