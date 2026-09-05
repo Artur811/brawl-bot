@@ -63,7 +63,7 @@ banned_users = set()
 state_lock = asyncio.Lock()
 order_stats = defaultdict(int)
 
-# ⭐ STARTUP
+# ⭐ STARTUP - ԱՎՏՈՄԱՏ ՈՒՂԱՐԿՈՒՄ ՀՐԱՎԵՐԻ ՀՂՈՒՄ
 @dp.startup()
 async def on_startup():
     try:
@@ -71,6 +71,35 @@ async def on_startup():
         logger.info("✅ Webhook-ը ջնջվեց")
     except Exception as e:
         logger.warning(f"Webhook-ի ջնջումը ձախողվեց: {e}")
+    
+    # ✅ ԱՎՏՈՄԱՏ ՈՒՂԱՐԿԵԼ ՀՐԱՎԵՐԻ ՀՂՈՒՄԸ
+    try:
+        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
+        
+        invite_link = await bot.create_chat_invite_link(
+            chat_id=chat_id,
+            member_limit=1,
+            expire_date=None
+        )
+        
+        await bot.send_message(
+            ADMIN_ID,
+            f"🚀 <b>Բոտը գործարկվեց</b>\n\n"
+            f"🔗 <b>Հրավերի հղում</b>\n\n"
+            f"{invite_link.invite_link}\n\n"
+            f"📌 Սեղմիր հղման վրա՝ խմբին միանալու համար:"
+        )
+        
+        logger.info(f"✅ Invite link sent to admin: {invite_link.invite_link}")
+        
+    except Exception as e:
+        logger.error(f"Failed to send invite link: {e}")
+        await bot.send_message(
+            ADMIN_ID,
+            f"❌ <b>Չհաջողվեց ստեղծել հրավերի հղում</b>\n\n"
+            f"Սխալ՝ {e}\n\n"
+            f"📌 Ստուգիր, արդյոք ORDER_CHANNEL_ID-ը ճիշտ է:"
+        )
 
 # ⭐ ԽԱՂԵՐԻ ԷՄՈՋԻՆԵՐ
 GAME_EMOJIS = {
@@ -250,6 +279,7 @@ def admin_receipt_kb(uid):
 def admin_main_kb(uid):
     return kb([
         [InlineKeyboardButton(text="🔐 2FA հաստատում", callback_data=f"verify:menu:{uid}")],
+        [InlineKeyboardButton(text="🔗 Հրավերի հղում", callback_data=f"invite:link:{uid}")],
         [InlineKeyboardButton(text="❌ Սխալ ID / Username", callback_data=f"id:reject:{uid}"),
          InlineKeyboardButton(text="❌ Սխալ պասսվորդ", callback_data=f"pass:reject:{uid}")],
         [InlineKeyboardButton(text="📸 Չեկը վատ է երևում", callback_data=f"receipt:bad:{uid}")],
@@ -373,8 +403,24 @@ async def send_client_photo(uid, photo_path, caption, markup=None):
 
 async def update_admin_order(uid, markup=None):
     u = get_user(uid)
+    chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
+    
     if not u.get("order_message_id") or not u.get("order_chat_id"):
-        return
+        try:
+            sent = await bot.send_photo(
+                chat_id,
+                u.get("receipt_file_id") or u.get("brawl_pass_screenshot_file_id"),
+                caption=order_caption(uid),
+                reply_markup=markup
+            )
+            u["order_message_id"] = sent.message_id
+            u["order_chat_id"] = chat_id
+            await save_state()
+            return
+        except Exception as e:
+            logger.error(f"Failed to send to admin: {e}")
+            return
+    
     try:
         await bot.edit_message_caption(
             chat_id=u["order_chat_id"],
@@ -471,6 +517,67 @@ async def run_web():
     logger.info("✅ Health server started on port %s", PORT)
     while True:
         await asyncio.sleep(3600)
+
+# ============================================
+# ⭐ /INVITE ՀՐԱՄԱՆ
+# ============================================
+
+@dp.message(Command("invite"))
+async def invite_command(message: Message):
+    uid = message.from_user.id
+    
+    if uid != ADMIN_ID:
+        await message.answer("❌ Մուտքը արգելված է")
+        return
+    
+    try:
+        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
+        
+        invite_link = await bot.create_chat_invite_link(
+            chat_id=chat_id,
+            member_limit=1,
+            expire_date=None
+        )
+        
+        await message.answer(
+            f"🔗 <b>Հրավերի հղում</b>\n\n"
+            f"{invite_link.invite_link}\n\n"
+            f"📌 Այս հղումով կարող ես միանալ խմբին:",
+            reply_markup=back_main_kb()
+        )
+    except Exception as e:
+        await message.answer(f"❌ Սխալ: {e}")
+
+# ============================================
+# ⭐ INVITE LINK CALLBACK (Ադմինի վահանակից)
+# ============================================
+
+@dp.callback_query(F.data.startswith("invite:link:"))
+async def invite_link_callback(c: CallbackQuery):
+    if c.from_user.id != ADMIN_ID:
+        await safe_answer(c, "Մուտքը արգելված է")
+        return
+    
+    uid = int(c.data.split(":")[2])
+    
+    try:
+        chat_id = int(ORDER_CHANNEL_ID) if ORDER_CHANNEL_ID else ADMIN_ID
+        
+        invite_link = await bot.create_chat_invite_link(
+            chat_id=chat_id,
+            member_limit=1,
+            expire_date=None
+        )
+        
+        await c.message.answer(
+            f"🔗 <b>Հրավերի հղում</b>\n\n"
+            f"{invite_link.invite_link}\n\n"
+            f"📌 Այս հղումով կարող ես միանալ խմբին:",
+            reply_markup=back_main_kb()
+        )
+        await safe_answer(c, "✅ Հղումը ուղարկվեց")
+    except Exception as e:
+        await safe_answer(c, f"❌ Սխալ: {e}")
 
 # ============================================
 # ⭐ ՀԻՄՆԱԿԱՆ ՀԵՆԴԼԵՐՆԵՐ
@@ -1349,7 +1456,7 @@ async def order_complete(c: CallbackQuery):
     await safe_answer(c, "✅ Պատվերը ավարտվեց")
 
 # ============================================
-# ⭐ 2FA - ԱՄԲՈՂՋԱԿԱՆ ԲԼՈԿ (ՇՏԿՎԱԾ - ՉԻ ՋՆՋՈՒՄ ՊԱՏՎԵՐԸ)
+# ⭐ 2FA - ԱՄԲՈՂՋԱԿԱՆ ԲԼՈԿ
 # ============================================
 
 @dp.callback_query(F.data.startswith("verify:menu:"))
@@ -1366,8 +1473,6 @@ async def verify_menu(c: CallbackQuery):
         return
     
     await safe_answer(c)
-    
-    # ✅ 2FA-ի կարգավիճակը գրվում է կանալում
     await update_admin_order(uid, admin_main_kb(uid))
     
     try:
@@ -1418,7 +1523,6 @@ async def verify_back(c: CallbackQuery):
             reply_markup=admin_main_kb(uid)
         )
 
-# ⭐ 2FA - ԱՅԼ ՍԱՐՔՈՎ
 @dp.callback_query(F.data.startswith("verify:device:"))
 async def verify_device(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1427,7 +1531,6 @@ async def verify_device(c: CallbackQuery):
     
     parts = c.data.split(":")
     
-    # ⭐ Եթե սա հաստատման կոճակ է (verify:device:confirm:{uid})
     if len(parts) >= 4 and parts[2] == "confirm":
         uid = int(parts[3])
         u = get_user(uid)
@@ -1436,7 +1539,6 @@ async def verify_device(c: CallbackQuery):
             await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
             return
         
-        # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
         u["verification_type"] = "device"
         u["verification_done"] = True
         u["verification_device_waiting"] = False
@@ -1444,10 +1546,8 @@ async def verify_device(c: CallbackQuery):
         u["status"] = "🔐 2FA՝ Այլ սարքով հաստատված"
         await save_state()
         
-        # ✅ Թարմացնում ենք կանալը
         await update_admin_order(uid, admin_main_kb(uid))
         
-        # ✅ Տեղեկացնում ենք ԿԼԻԵՆՏԻՆ
         await send_client(
             uid,
             "✅ 2FA հաստատումը հաջողվեց։\n\n"
@@ -1474,7 +1574,6 @@ async def verify_device(c: CallbackQuery):
             )
         return
     
-    # ⭐ Սովորական մենյուից ընտրություն (verify:device:{uid})
     if len(parts) == 3:
         uid = int(parts[2])
         u = get_user(uid)
@@ -1483,7 +1582,6 @@ async def verify_device(c: CallbackQuery):
             await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
             return
         
-        # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
         u["verification_type"] = "device"
         u["verification_done"] = False
         u["verification_device_waiting"] = True
@@ -1492,10 +1590,8 @@ async def verify_device(c: CallbackQuery):
         u["status"] = "⏳ Սպասվում է այլ սարքով հաստատում"
         await save_state()
         
-        # ✅ Թարմացնում ենք կանալը
         await update_admin_order(uid, admin_main_kb(uid))
         
-        # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
         await send_client_photo(
             uid,
             VERIFY_IMAGES["device"],
@@ -1528,7 +1624,6 @@ async def verify_device(c: CallbackQuery):
             )
         await safe_answer(c, "⏳ Սպասում ենք այլ սարքով հաստատման")
 
-# ⭐ 2FA - AUTHENTICATOR
 @dp.callback_query(F.data.startswith("verify:auth:"))
 async def verify_auth(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1542,7 +1637,6 @@ async def verify_auth(c: CallbackQuery):
         await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
         return
     
-    # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
     u["verification_type"] = "auth"
     u["verification_done"] = False
     u["verification_code_waiting"] = True
@@ -1550,10 +1644,8 @@ async def verify_auth(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է Authenticator կոդ"
     await save_state()
     
-    # ✅ Թարմացնում ենք կանալը
     await update_admin_order(uid, admin_verify_retry_kb(uid, "auth"))
     
-    # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
     await send_client_photo(
         uid,
         VERIFY_IMAGES["auth"],
@@ -1584,7 +1676,6 @@ async def verify_auth(c: CallbackQuery):
         )
     await safe_answer(c, "⏳ Սպասում ենք Authenticator կոդի")
 
-# ⭐ 2FA - E-MAIL
 @dp.callback_query(F.data.startswith("verify:email:"))
 async def verify_email(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1598,7 +1689,6 @@ async def verify_email(c: CallbackQuery):
         await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
         return
     
-    # ✅ ՄԻԱՅՆ 2FA-Ն ԵՆՔ ՓՈԽՈՒՄ, ՊԱՏՎԵՐԸ ՉԵՆՔ ՋՆՋՈՒՄ
     u["verification_type"] = "email"
     u["verification_done"] = False
     u["verification_code_waiting"] = True
@@ -1606,10 +1696,8 @@ async def verify_email(c: CallbackQuery):
     u["status"] = "⏳ Սպասվում է E-mail կոդ"
     await save_state()
     
-    # ✅ Թարմացնում ենք կանալը
     await update_admin_order(uid, admin_verify_retry_kb(uid, "email"))
     
-    # ✅ Ուղարկում ենք հրահանգը ԿԼԻԵՆՏԻՆ
     await send_client_photo(
         uid,
         VERIFY_IMAGES["email"],
@@ -1640,7 +1728,6 @@ async def verify_email(c: CallbackQuery):
         )
     await safe_answer(c, "⏳ Սպասում ենք E-mail կոդի")
 
-# ⭐ 2FA - RETRY (Ադմինը սեղմում է նոր կոդ ուղարկելու համար)
 @dp.callback_query(F.data.startswith("verify:retry:"))
 async def verify_retry(c: CallbackQuery):
     if c.from_user.id != ADMIN_ID:
@@ -1656,17 +1743,14 @@ async def verify_retry(c: CallbackQuery):
         await safe_answer(c, "⚠️ Ակտիվ պատվեր չկա")
         return
     
-    # ✅ Վերականգնել կոդի սպասման վիճակը
     u["verification_code_waiting"] = True
     u["verification_done"] = False
     u["verification_attempts"] = 0
     u["status"] = f"⏳ Սպասվում է նոր {verify_type} կոդ"
     await save_state()
     
-    # ✅ Թարմացնում ենք կանալը
     await update_admin_order(uid, admin_verify_retry_kb(uid, verify_type))
     
-    # ✅ Ուղարկել նոր հրահանգ կլիենտին
     if verify_type == "auth":
         await send_client_photo(
             uid,
